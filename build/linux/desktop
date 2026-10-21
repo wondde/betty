@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=Betty
+Comment=BerryTicket in the menu bar
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/betty %u
+Terminal=false
+Type=Application
+Icon=betty
+Categories=Utility;
+StartupWMClass=betty
+
+ 

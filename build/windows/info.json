@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0409": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "Blueberry Team",
+			"FileDescription": "BerryTicket in the menu bar",
+			"LegalCopyright": "(c) 2026, Blueberry Team",
+			"ProductName": "Betty",
+			"Comments": "Betty for BerryTicket"
+		}
+	}
+}

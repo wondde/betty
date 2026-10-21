@@ -1,0 +1,41 @@
+/* Native macOS feel: the window itself is Liquid Glass (set in Go); the page stays transparent. */
+:root {
+  color-scheme: light dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  --fg: #1d1d1f;
+  --fg2: rgba(60, 60, 67, 0.72);
+  --fg3: rgba(60, 60, 67, 0.48);
+  --line: rgba(0, 0, 0, 0.08);
+  --fill: rgba(0, 0, 0, 0.045);
+  --fill-hover: rgba(0, 0, 0, 0.08);
+  --card: rgba(255, 255, 255, 0.55);
+  --accent: #007aff;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --green: #34c759;
+  --discord: #5865f2;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #f5f5f7;
+    --fg2: rgba(235, 235, 245, 0.7);
+    --fg3: rgba(235, 235, 245, 0.42);
+    --line: rgba(255, 255, 255, 0.1);
+    --fill: rgba(255, 255, 255, 0.07);
+    --fill-hover: rgba(255, 255, 255, 0.12);
+    --card: rgba(255, 255, 255, 0.07);
+    --accent: #0a84ff;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --green: #30d158;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; color: var(--fg); overflow: hidden; user-select: none; -webkit-user-select: none; cursor: default; }
+#app { height: 100%; }
+button { font: inherit; color: inherit; border: none; background: none; padding: 0; cursor: default; }
+input { font: inherit; color: inherit; }
+::-webkit-scrollbar { width: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
