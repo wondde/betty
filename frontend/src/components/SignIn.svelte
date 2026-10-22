@@ -15,7 +15,7 @@
 </script>
 
 <section class="signin">
-  <div class="berry" aria-hidden="true">🫐</div>
+  <img class="berry" src="/betty-icon.png" alt="" width="88" height="88" />
   <h1>Betty</h1>
   <p>Discord 계정으로 로그인하면<br />나에게 배정된 업무가 메뉴바에 모여요.</p>
   {#if app.view.signingIn}
@@ -30,7 +30,7 @@
 
 <style>
   .signin { height: 100%; padding-top: 40px !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px 28px; text-align: center; }
-  .berry { font-size: 40px; }
+  .berry { width: 88px; height: 88px; margin-bottom: 2px; }
   h1 { margin: 0; font-size: 22px; letter-spacing: -0.3px; }
   p { margin: 0; color: var(--fg2); line-height: 1.5; }
   .discord { margin-top: 8px; width: 100%; height: 36px; border-radius: 10px; background: var(--discord); color: #fff; font-weight: 700; }

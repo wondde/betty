@@ -65,7 +65,7 @@
     {/each}
   {:else}
     <div class="about">
-      <div class="berry">🫐</div>
+      <img class="berry" src="/betty-icon.png" alt="" width="80" height="80" />
       <h1>Betty</h1>
       <p class="muted">버전 {app.view.version}</p>
       <p>블루베리 팀의 BerryTicket을 위한 맥 앱</p>
@@ -97,7 +97,7 @@
   kbd { padding: 2px 8px; border-radius: 6px; background: var(--fill); font: 600 12px -apple-system, sans-serif; }
   .about { text-align: center; padding: 10px 0; }
   .about p { margin: 4px 0; }
-  .berry { font-size: 40px; }
+  .berry { width: 80px; height: 80px; }
   .error { color: var(--red); font-size: 12px; }
   .done { display: block; margin: 14px 0 0 auto; padding: 5px 16px; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; }
 </style>

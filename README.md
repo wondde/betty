@@ -22,7 +22,7 @@ internal/signin         Discord 로그인: 시스템 브라우저 + 127.0.0.1 �
 internal/vault          키체인에 기기 토큰 보관
 internal/prefs          ~/Library/Application Support/Betty/prefs.json: 확인한 업무, 오프라인 스냅샷
 frontend/src            Svelte 5: TaskWindow(목록), Onboarding(첫 안내), Sheet(설정·단축키·정보), QuickAdd, Composer(@ # 날짜 입력)
-assets/tray-template.png  메뉴바 템플릿 아이콘 (go run ./tools/trayicon 으로 다시 생성)
+tools/appicon/betty.swift  앱 아이콘·Icon Composer 레이어·메뉴바 아이콘·화면용 이미지를 한 번에 그리는 스크립트
 ```
 
 Go 서비스가 바뀌면 `betty:view` 이벤트로 모든 창에 같은 상태가 전달됩니다. 네트워크와 키체인 작업은 전부 Go 쪽에서 하고, 화면은 그리기만 합니다.
