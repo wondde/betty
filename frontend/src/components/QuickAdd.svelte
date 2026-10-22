@@ -36,8 +36,8 @@
 <div class="panel">
   {#if !app.view.signedIn}
     <div class="signed-out">
-      <span>메뉴바의 Betty에서 먼저 로그인해 주세요.</span>
-      <button onclick={hide}>닫기</button>
+      <span>Betty에 먼저 로그인해 주세요.</span>
+      <button class="primary" onclick={() => (hide(), Betty.ShowTasks())}>로그인 창 열기</button>
     </div>
   {:else}
     <Composer bind:this={composer} big autofocus onresult={result} onlayout={layout} oncancel={hide} />
@@ -50,5 +50,6 @@
   .note { margin: 2px 16px 8px; font-size: 12px; font-weight: 600; color: var(--red); }
   .note.ok { color: var(--green); }
   .signed-out { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 16px; font-size: 14px; color: var(--fg2); }
-  .signed-out button { padding: 4px 10px; border-radius: 7px; background: var(--fill); }
+  .signed-out button { padding: 5px 12px; border-radius: 7px; background: var(--fill); font-weight: 600; }
+  .signed-out .primary { background: var(--accent); color: #fff; }
 </style>

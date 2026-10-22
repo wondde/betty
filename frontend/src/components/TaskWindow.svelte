@@ -126,7 +126,7 @@
     <footer>
       {#if toast}<p class="toast" class:ok={toast.ok}>{toast.text}</p>{/if}
       <Composer onresult={(text, ok) => say(text, ok)} />
-      <p class="who">{v.member?.name} · ⌥⌘N 빠른 추가</p>
+      <p class="who">{v.member?.name} · ⌥⌘B 할 일 창 · ⌥⌘N 빠른 추가</p>
     </footer>
   </div>
 {/if}

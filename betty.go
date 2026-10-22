@@ -52,7 +52,8 @@ type Betty struct {
 	syncedAt  time.Time
 	signingIn context.CancelFunc
 
-	onCount func(open int) // menu bar label
+	onCount     func(open int) // menu bar label
+	onShowTasks func()         // open the task window centred (set by main)
 }
 
 func NewBetty(p *prefs.Store, ns *notifications.NotificationService) *Betty {
@@ -389,6 +390,13 @@ func (b *Betty) OpenURL(link string) error {
 }
 
 func (b *Betty) OpenBoard() error { return b.OpenURL(b.prefs.Server() + "/") }
+
+// ShowTasks opens the task window centred on screen, e.g. from the quick add panel.
+func (b *Betty) ShowTasks() {
+	if b.onShowTasks != nil {
+		b.onShowTasks()
+	}
+}
 
 func (b *Betty) HideWindow(name string) {
 	if w, ok := application.Get().Window.GetByName(name); ok {

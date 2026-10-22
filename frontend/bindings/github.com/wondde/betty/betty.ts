@@ -72,6 +72,13 @@ export function SetStatus(id: string, status: string): $CancellablePromise<berry
 }
 
 /**
+ * ShowTasks opens the task window centred on screen, e.g. from the quick add panel.
+ */
+export function ShowTasks(): $CancellablePromise<void> {
+    return $Call.ByID(2347480837);
+}
+
+/**
  * SignIn opens the browser for Discord and waits for the loopback callback.
  */
 export function SignIn(): $CancellablePromise<void> {
