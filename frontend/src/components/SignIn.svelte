@@ -29,7 +29,7 @@
 </section>
 
 <style>
-  .signin { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px 28px; text-align: center; }
+  .signin { height: 100%; padding-top: 40px !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px 28px; text-align: center; }
   .berry { font-size: 40px; }
   h1 { margin: 0; font-size: 22px; letter-spacing: -0.3px; }
   p { margin: 0; color: var(--fg2); line-height: 1.5; }

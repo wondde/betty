@@ -1,17 +1,40 @@
 <script lang="ts">
   // The menu bar window: my tasks grouped by urgency, recent done, and an add field.
+  import { onMount } from 'svelte'
+  import { Events } from '@wailsio/runtime'
   import { Betty } from '../../bindings/github.com/wondde/betty'
+  import { BettyCommand } from '../../bindings/events'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
   import { daysUntil, dayGroup, sortTasks, todayLabel } from '../lib/tasks'
   import TaskCard from './TaskCard.svelte'
   import Composer from './Composer.svelte'
   import SignIn from './SignIn.svelte'
+  import Onboarding from './Onboarding.svelte'
+  import Sheet from './Sheet.svelte'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
   let showDone = $state(false)
   let refreshing = $state(false)
   let toastTimer: ReturnType<typeof setTimeout>
+  let composer = $state<Composer>()
+  let tour = $state(false)
+  let sheet = $state<'settings' | 'shortcuts' | 'about' | null>(null)
+
+  // App menu commands (파일 · 보기 · 도움말 …) arrive from Go as "betty:command".
+  onMount(() =>
+    Events.On(BettyCommand, (e) => {
+      const name = e.data as string
+      if (name === 'new-task') {
+        sheet = null
+        composer?.focus()
+      } else if (name === 'toggle-done') showDone = !showDone
+      else if (name === 'onboarding') {
+        sheet = null
+        tour = true
+      } else if (name === 'settings' || name === 'shortcuts' || name === 'about') sheet = name
+    }),
+  )
 
   const v = $derived(app.view)
   const isNew = $derived(new Set(v.new ?? []))
@@ -61,8 +84,11 @@
   }
 </script>
 
+<div class="titlebar" aria-hidden="true"></div>
 {#if !v.signedIn}
   <SignIn />
+{:else if !v.onboarded || tour}
+  <Onboarding ondone={() => (tour = false)} />
 {:else}
   <div class="window">
     <header>
@@ -83,13 +109,6 @@
     {#if v.offline}<p class="offline">오프라인 · 마지막으로 불러온 목록이에요</p>{/if}
 
     <main>
-      {#if !v.hintDone && active.length}
-        <div class="hint">
-          <span>동그라미를 누르면 완료돼요. 잘못 눌렀다면 바로 한 번 더 누르면 취소돼요.</span>
-          <button onclick={() => Betty.DismissHint()}>알겠어요</button>
-        </div>
-      {/if}
-
       {#each groups as g (g.title)}
         <h2>{g.title}</h2>
         <div class="list">
@@ -100,7 +119,8 @@
       {:else}
         <div class="empty">
           <div class="big">🎉</div>
-          <p>모두 끝냈어요</p>
+          <p><b>지금 맡은 일이 없어요</b></p>
+          <p>새 업무가 배정되면 알림으로 알려 드릴게요.<br />직접 추가하려면 아래 입력창에 적거나 ⌘N을 누르세요.</p>
         </div>
       {/each}
 
@@ -125,15 +145,18 @@
 
     <footer>
       {#if toast}<p class="toast" class:ok={toast.ok}>{toast.text}</p>{/if}
-      <Composer onresult={(text, ok) => say(text, ok)} />
-      <p class="who">{v.member?.name} · ⌥⌘B 할 일 창 · ⌥⌘N 빠른 추가</p>
+      <Composer bind:this={composer} onresult={(text, ok) => say(text, ok)} />
+      <p class="who">{v.member?.name} · ⌘N 새 할 일 · ⌥⌘N 어디서든 추가 · ⌘, 설정</p>
     </footer>
   </div>
+  {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
 {/if}
 
 <style>
-  .window { height: 100%; display: flex; flex-direction: column; }
-  header { display: flex; align-items: flex-start; justify-content: space-between; padding: 16px 16px 0; --wails-draggable: drag; }
+  /* The window keeps its traffic lights (hidden-inset title bar); this strip is where you drag it. */
+  .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 40px; --wails-draggable: drag; z-index: 5; }
+  .window { height: 100%; display: flex; flex-direction: column; padding-top: 36px; }
+  header { display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 16px 0; }
   h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
   .date { margin: 1px 0 0; font-size: 11.5px; color: var(--fg3); font-weight: 500; }
   .tools { display: flex; gap: 4px; --wails-draggable: no-drag; }
@@ -148,10 +171,9 @@
   main { flex: 1; overflow-y: auto; padding: 4px 12px 8px; }
   h2 { margin: 12px 4px 6px; font-size: 11px; font-weight: 700; color: var(--fg3); letter-spacing: 0.2px; }
   .list { display: flex; flex-direction: column; gap: 6px; }
-  .hint { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--fill); font-size: 11.5px; line-height: 1.45; color: var(--fg2); }
-  .hint span { flex: 1; }
-  .hint button { flex: none; padding: 3px 8px; border-radius: 6px; background: var(--fill-hover); font-size: 11px; font-weight: 700; }
-  .empty { text-align: center; padding: 60px 0 40px; color: var(--fg3); }
+  .empty { text-align: center; padding: 60px 20px 40px; color: var(--fg3); line-height: 1.6; }
+  .empty p { margin: 4px 0; }
+  .empty b { color: var(--fg); font-size: 14px; }
   .empty .big { font-size: 34px; }
   .done-toggle { margin: 14px 4px 4px; font-size: 11.5px; font-weight: 700; color: var(--fg3); }
   .done { list-style: none; margin: 0; padding: 0 4px; }

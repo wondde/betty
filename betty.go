@@ -22,6 +22,9 @@ import (
 
 const pollEvery = 15 * time.Second
 
+// version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
+const version = "0.2.0"
+
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
 type View struct {
@@ -34,6 +37,8 @@ type View struct {
 	New       []string        `json:"new"`
 	Order     []string        `json:"order"`
 	HintDone  bool            `json:"hintDone"`
+	Onboarded bool            `json:"onboarded"`
+	Version   string          `json:"version"`
 	Offline   bool            `json:"offline"`
 	SyncedAt  string          `json:"syncedAt"`
 	Server    string          `json:"server"`
@@ -75,7 +80,7 @@ func (b *Betty) View() View {
 	d := b.prefs.Get()
 	b.mu.Lock()
 	v := View{SignedIn: vault.Token() != "", SigningIn: b.signingIn != nil, Offline: b.offline, Server: b.prefs.Server(),
-		Order: d.Order, HintDone: d.HintDone}
+		Order: d.Order, HintDone: d.HintDone, Onboarded: d.Onboarded, Version: version}
 	if !b.syncedAt.IsZero() {
 		v.SyncedAt = b.syncedAt.Format(time.RFC3339)
 	}
@@ -376,6 +381,38 @@ func (b *Betty) SignOut() error {
 	b.prefs.Update(func(d *prefs.Data) { d.Snapshot = nil })
 	b.emit()
 	return nil
+}
+
+// ---------- onboarding & settings ----------
+
+// FinishOnboarding records that the first-run tour was seen (Help menu shows it again).
+func (b *Betty) FinishOnboarding() {
+	b.prefs.Update(func(d *prefs.Data) { d.Onboarded = true; d.HintDone = true })
+	b.emit()
+}
+
+// Autostart reports whether Betty opens at login.
+func (b *Betty) Autostart() bool {
+	on, err := application.Get().Autostart.IsEnabled()
+	return err == nil && on
+}
+
+func (b *Betty) SetAutostart(on bool) error {
+	if on {
+		return application.Get().Autostart.Enable()
+	}
+	return application.Get().Autostart.Disable()
+}
+
+// NotificationsAllowed reports the macOS notification permission without prompting.
+func (b *Betty) NotificationsAllowed() bool {
+	ok, err := b.notify.CheckNotificationAuthorization()
+	return err == nil && ok
+}
+
+// AllowNotifications shows the macOS permission prompt (once; later it only reports).
+func (b *Betty) AllowNotifications() (bool, error) {
+	return b.notify.RequestNotificationAuthorization()
 }
 
 // ---------- windows & links ----------

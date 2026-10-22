@@ -19,6 +19,8 @@ export interface View {
     "new": string[] | null;
     "order": string[] | null;
     "hintDone": boolean;
+    "onboarded": boolean;
+    "version": string;
     "offline": boolean;
     "syncedAt": string;
     "server": string;

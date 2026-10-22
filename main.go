@@ -1,15 +1,14 @@
-// Betty — BerryTicket in the macOS menu bar.
+// Betty — BerryTicket for macOS.
 //
-//	menu bar icon ── click ──▶ "main" popover window (my tasks)
-//	⌥⌘B (global) / reopening Betty.app ─▶ the same window, centred on screen
-//	⌥⌘N (global)  ──────────▶ "quick" Spotlight-style panel (add a task, @name #project 내일)
-//	right click   ──────────▶ menu: quick add, web board, launch at login, sign out, quit
+// A regular Mac app: Dock icon, the usual app menu (Betty · 파일 · 편집 · 보기 · 윈도우 · 도움말)
+// and a normal titled window with my tasks. Extras on top of that:
 //
-// On notched MacBooks a crowded menu bar hides icons behind the notch, so nothing may
-// depend on the menu bar icon alone: the window also opens centred from the shortcut,
-// from relaunching the app, and on first launch while signed out.
+//	⌥⌘N (global)    Spotlight-style quick add panel (@name #project 내일)
+//	⌥⌘B (global)    bring the task window forward from anywhere
+//	menu bar icon   the same window, plus quick add / board in its menu
 //
-// All network, Keychain and notification work is in the Betty service (betty.go).
+// All network, Keychain and notification work is in the Betty service (betty.go);
+// menu commands that need the UI are sent to it as "betty:command" events.
 package main
 
 import (
@@ -38,91 +37,71 @@ const (
 func init() {
 	application.RegisterEvent[View]("betty:view")
 	application.RegisterEvent[string]("betty:quick-open")
+	// about | new-task | settings | onboarding | toggle-done | shortcuts
+	application.RegisterEvent[string]("betty:command")
 }
 
 func main() {
 	ns := notifications.New()
 	betty := NewBetty(prefs.Open(), ns)
 
-	var tray *application.SystemTray
-	var showCentered func()
+	var showTasks func()
 	app := application.New(application.Options{
 		Name:        "Betty",
-		Description: "BerryTicket in the menu bar",
+		Description: "BerryTicket for macOS",
 		Services: []application.Service{
 			application.NewService(betty),
 			application.NewService(ns),
 		},
 		Assets: application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
 		Mac: application.MacOptions{
-			// Menu bar app: no Dock icon, no app switcher entry.
-			ActivationPolicy: application.ActivationPolicyAccessory,
+			ActivationPolicy: application.ActivationPolicyRegular,
+			// Closing the window keeps Betty running for notifications; quit with ⌘Q.
+			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: "com.blueberryteam.betty",
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
-				if showCentered != nil {
-					showCentered()
+				if showTasks != nil {
+					showTasks()
 				}
 			},
 		},
 	})
 
-	glass := application.MacWindow{
-		Backdrop:    application.MacBackdropLiquidGlass,
-		LiquidGlass: application.MacLiquidGlass{Style: application.LiquidGlassStyleAutomatic, Material: application.NSVisualEffectMaterialAuto, CornerRadius: 18},
-		TitleBar:    application.MacTitleBar{AppearsTransparent: true, Hide: true},
-	}
-
-	// My tasks, dropped down from the menu bar icon.
+	// ---------- main window ----------
 	tasks := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Name:            "main",
-		Title:           "Betty",
-		Width:           368,
-		Height:          560,
-		Frameless:       true,
-		Hidden:          true,
-		DisableResize:  true,
-		HideOnEscape:   true,
-		AlwaysOnTop:    true,
-		BackgroundType: application.BackgroundTypeTransparent,
-		Mac:            glass,
+		Name:      "main",
+		Title:     "Betty",
+		Width:     420,
+		Height:    680,
+		MinWidth:  360,
+		MinHeight: 480,
+		Mac: application.MacWindow{
+			Backdrop:                application.MacBackdropTranslucent,
+			TitleBar:                application.MacTitleBarHiddenInset,
+			InvisibleTitleBarHeight: 52,
+		},
+		BackgroundType: application.BackgroundTypeTranslucent,
 		URL:            "/",
 	})
 	tasks.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		tasks.Hide()
 		e.Cancel()
 	})
-	// Dropped down from the menu bar it behaves like a popover and hides when you click
-	// elsewhere. Opened centred (shortcut, relaunch, sign-in) it stays until closed: a
-	// background app may not get focus right away, and hiding on that would make it vanish.
-	var fromTray bool
-	tasks.OnWindowEvent(events.Common.WindowLostFocus, func(*application.WindowEvent) {
-		if fromTray {
-			tasks.Hide()
-		}
-	})
-	showCentered = func() {
-		fromTray = false
-		tasks.Center()
+	showTasks = func() {
 		tasks.Show()
 		tasks.Focus()
 	}
-	toggleCentered := func() {
-		if tasks.IsVisible() {
-			tasks.Hide()
-		} else {
-			showCentered()
-		}
+	betty.onShowTasks = showTasks
+	command := func(name string) {
+		showTasks()
+		tasks.EmitEvent("betty:command", name)
 	}
-	betty.onShowTasks = showCentered
+	// Clicking the Dock icon brings the window back after it was closed.
+	app.Event.OnApplicationEvent(events.Mac.ApplicationShouldHandleReopen, func(*application.ApplicationEvent) { showTasks() })
 
-	// Quick add, like Spotlight: floats over full-screen apps on every Space.
-	quickGlass := glass
-	quickGlass.WindowClass = application.MacWindowClassPanel
-	quickGlass.WindowLevel = application.MacWindowLevelFloating
-	quickGlass.CollectionBehavior = application.MacWindowCollectionBehaviorCanJoinAllSpaces | application.MacWindowCollectionBehaviorFullScreenAuxiliary
-	quickGlass.LiquidGlass.CornerRadius = 16
+	// ---------- quick add panel ----------
 	quick := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:            "quick",
 		Title:           "Betty 빠른 추가",
@@ -135,8 +114,16 @@ func main() {
 		HideOnFocusLost: true,
 		InitialPosition: application.WindowCentered,
 		BackgroundType:  application.BackgroundTypeTransparent,
-		Mac:             quickGlass,
-		URL:             "/#/quick",
+		Mac: application.MacWindow{
+			Backdrop:    application.MacBackdropLiquidGlass,
+			LiquidGlass: application.MacLiquidGlass{Style: application.LiquidGlassStyleAutomatic, Material: application.NSVisualEffectMaterialAuto, CornerRadius: 16},
+			TitleBar:    application.MacTitleBar{AppearsTransparent: true, Hide: true},
+			WindowClass: application.MacWindowClassPanel,
+			WindowLevel: application.MacWindowLevelFloating,
+			// Shows over full-screen apps on every Space, like Spotlight.
+			CollectionBehavior: application.MacWindowCollectionBehaviorCanJoinAllSpaces | application.MacWindowCollectionBehaviorFullScreenAuxiliary,
+		},
+		URL: "/#/quick",
 	})
 	quick.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
 		quick.Hide()
@@ -149,66 +136,94 @@ func main() {
 		quick.EmitEvent("betty:quick-open", "")
 	}
 
-	// Menu bar icon with the number of open tasks next to it.
-	tray = app.SystemTray.New()
+	// ---------- app menu (standard macOS layout, Korean labels) ----------
+	item := func(label string, base *application.MenuItem) *application.MenuItem { return base.SetLabel(label) }
+	menu := app.NewMenu()
+
+	appMenu := menu.AddSubmenu("Betty")
+	appMenu.Add("Betty에 관하여").OnClick(func(*application.Context) { command("about") })
+	appMenu.AddSeparator()
+	appMenu.Add("설정…").SetAccelerator("CmdOrCtrl+,").OnClick(func(*application.Context) { command("settings") })
+	appMenu.AddSeparator()
+	appMenu.Add("로그아웃").OnClick(func(*application.Context) { _ = betty.SignOut() })
+	appMenu.AddSeparator()
+	appMenu.Append(application.NewMenuFromItems(
+		item("Betty 가리기", application.NewHideMenuItem()),
+		item("기타 가리기", application.NewHideOthersMenuItem()),
+		item("모두 보기", application.NewShowAllMenuItem()),
+	))
+	appMenu.AddSeparator()
+	appMenu.Append(application.NewMenuFromItems(item("Betty 종료", application.NewQuitMenuItem())))
+
+	fileMenu := menu.AddSubmenu("파일")
+	fileMenu.Add("새 할 일").SetAccelerator("CmdOrCtrl+N").OnClick(func(*application.Context) { command("new-task") })
+	fileMenu.Add("빠른 추가").SetAccelerator(quickAddShortcut).OnClick(func(*application.Context) { openQuick() })
+	fileMenu.AddSeparator()
+	fileMenu.Add("새로고침").SetAccelerator("CmdOrCtrl+R").OnClick(func(*application.Context) { go betty.Refresh() })
+	fileMenu.Add("웹 보드 열기").SetAccelerator("CmdOrCtrl+Shift+B").OnClick(func(*application.Context) { _ = betty.OpenBoard() })
+	fileMenu.AddSeparator()
+	fileMenu.Append(application.NewMenuFromItems(item("창 닫기", application.NewCloseMenuItem())))
+
+	editMenu := menu.AddSubmenu("편집")
+	editMenu.Append(application.NewMenuFromItems(
+		item("실행 취소", application.NewUndoMenuItem()),
+		item("실행 복귀", application.NewRedoMenuItem()),
+	))
+	editMenu.AddSeparator()
+	editMenu.Append(application.NewMenuFromItems(
+		item("오려두기", application.NewCutMenuItem()),
+		item("복사하기", application.NewCopyMenuItem()),
+		item("붙여넣기", application.NewPasteMenuItem()),
+		item("전체 선택", application.NewSelectAllMenuItem()),
+	))
+
+	viewMenu := menu.AddSubmenu("보기")
+	viewMenu.Add("최근 완료 보기/숨기기").SetAccelerator("CmdOrCtrl+Shift+D").OnClick(func(*application.Context) { command("toggle-done") })
+
+	windowMenu := menu.AddSubmenu("윈도우")
+	windowMenu.Append(application.NewMenuFromItems(
+		item("최소화", application.NewMinimiseMenuItem()),
+		item("확대/축소", application.NewZoomMenuItem()),
+	))
+	windowMenu.AddSeparator()
+	windowMenu.Add("할 일 창").SetAccelerator(showTasksShortcut).OnClick(func(*application.Context) { showTasks() })
+
+	helpMenu := menu.AddSubmenu("도움말")
+	helpMenu.Add("Betty 사용법 다시 보기").OnClick(func(*application.Context) { command("onboarding") })
+	helpMenu.Add("키보드 단축키").OnClick(func(*application.Context) { command("shortcuts") })
+
+	app.Menu.SetApplicationMenu(menu)
+
+	// ---------- menu bar icon ----------
+	tray := app.SystemTray.New()
 	tray.SetTemplateIcon(trayIcon)
 	tray.SetTooltip("Betty")
-	tray.AttachWindow(tasks).WindowOffset(6)
-	tray.OnClick(func() {
-		fromTray = true
-		tray.ToggleWindow()
-	})
+	tray.OnClick(showTasks)
+	trayMenu := app.NewMenu()
+	trayMenu.Add("할 일 창 열기").OnClick(func(*application.Context) { showTasks() })
+	trayMenu.Add("빠른 추가").SetAccelerator(quickAddShortcut).OnClick(func(*application.Context) { openQuick() })
+	trayMenu.Add("웹 보드 열기").OnClick(func(*application.Context) { _ = betty.OpenBoard() })
+	trayMenu.AddSeparator()
+	trayMenu.Add("Betty 종료").OnClick(func(*application.Context) { app.Quit() })
+	tray.SetMenu(trayMenu)
 	betty.onCount = func(open int) {
+		label := ""
 		if open > 0 {
-			tray.SetLabel(fmt.Sprint(open))
-		} else {
-			tray.SetLabel("")
+			label = fmt.Sprint(open)
 		}
+		tray.SetLabel(label)
 	}
 
-	menu := app.NewMenu()
-	menu.Add("빠른 추가").SetAccelerator(quickAddShortcut).OnClick(func(*application.Context) { openQuick() })
-	menu.Add("할 일 창 열기").SetAccelerator(showTasksShortcut).OnClick(func(*application.Context) { showCentered() })
-	menu.Add("웹 보드 열기").OnClick(func(*application.Context) { _ = betty.OpenBoard() })
-	menu.Add("새로고침").OnClick(func(*application.Context) { go betty.Refresh() })
-	menu.AddSeparator()
-	autostart := menu.AddCheckbox("로그인 시 자동 실행", false)
-	if on, err := app.Autostart.IsEnabled(); err == nil {
-		autostart.SetChecked(on)
-	}
-	autostart.OnClick(func(*application.Context) {
-		var err error
-		if autostart.Checked() {
-			err = app.Autostart.Enable()
-		} else {
-			err = app.Autostart.Disable()
-		}
-		if err != nil {
-			autostart.SetChecked(!autostart.Checked())
-			app.Dialog.Error().SetTitle("자동 실행").SetMessage(err.Error()).Show()
-		}
-	})
-	menu.Add("로그아웃").OnClick(func(*application.Context) { _ = betty.SignOut() })
-	menu.AddSeparator()
-	menu.Add("Betty 종료").SetAccelerator("CmdOrCtrl+Q").OnClick(func(*application.Context) { app.Quit() })
-	tray.SetMenu(menu)
-
+	// ---------- global shortcuts ----------
 	if err := app.GlobalShortcut.Register(quickAddShortcut, openQuick); err != nil {
 		log.Printf("quick add shortcut %s unavailable: %v", quickAddShortcut, err)
 	}
-	if err := app.GlobalShortcut.Register(showTasksShortcut, toggleCentered); err != nil {
+	if err := app.GlobalShortcut.Register(showTasksShortcut, showTasks); err != nil {
 		log.Printf("task window shortcut %s unavailable: %v", showTasksShortcut, err)
 	}
 
-	// Signed out: show the sign-in window right away instead of waiting for a menu bar click.
-	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
-		if !betty.View().SignedIn {
-			showCentered()
-		}
-	})
-
 	// Clicking a "new task" notification opens the task list.
-	ns.OnNotificationResponse(func(notifications.NotificationResult) { tray.ShowWindow() })
+	ns.OnNotificationResponse(func(notifications.NotificationResult) { showTasks() })
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

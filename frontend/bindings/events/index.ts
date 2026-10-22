@@ -9,6 +9,11 @@ import type {} from "../github.com/wailsapp/wails/v3/internal/eventdata.js";
 import "../github.com/wailsapp/wails/v3/internal/eventcreate.js";
 
 /**
+ * Name of the custom event "betty:command".
+ */
+export const BettyCommand = "betty:command";
+
+/**
  * Name of the custom event "betty:quick-open".
  */
 export const BettyQuickOpen = "betty:quick-open";

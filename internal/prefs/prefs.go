@@ -14,12 +14,13 @@ import (
 const DefaultServer = "https://ticket.blueberry-team.com"
 
 type Data struct {
-	Server   string       `json:"server,omitempty"` // override for development
-	Seen     []string     `json:"seen"`             // tasks already looked at (NEW badge)
-	Notified []string     `json:"notified"`         // tasks already announced
-	Order    []string     `json:"order"`            // card order the user dragged
-	HintDone bool         `json:"hint_done"`
-	Snapshot *berry.State `json:"snapshot,omitempty"` // last loaded state, shown offline
+	Server    string       `json:"server,omitempty"` // override for development
+	Seen      []string     `json:"seen"`             // tasks already looked at (NEW badge)
+	Notified  []string     `json:"notified"`         // tasks already announced
+	Order     []string     `json:"order"`            // card order the user dragged
+	HintDone  bool         `json:"hint_done"`
+	Onboarded bool         `json:"onboarded"`          // finished the first-run tour
+	Snapshot  *berry.State `json:"snapshot,omitempty"` // last loaded state, shown offline
 }
 
 type Store struct {

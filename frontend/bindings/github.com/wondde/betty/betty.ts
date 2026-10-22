@@ -23,6 +23,20 @@ export function Acknowledge(id: string): $CancellablePromise<void> {
     return $Call.ByID(121669712, id);
 }
 
+/**
+ * AllowNotifications shows the macOS permission prompt (once; later it only reports).
+ */
+export function AllowNotifications(): $CancellablePromise<boolean> {
+    return $Call.ByID(3353362703);
+}
+
+/**
+ * Autostart reports whether Betty opens at login.
+ */
+export function Autostart(): $CancellablePromise<boolean> {
+    return $Call.ByID(3160485329);
+}
+
 export function CancelSignIn(): $CancellablePromise<void> {
     return $Call.ByID(1623352896);
 }
@@ -38,8 +52,22 @@ export function DismissHint(): $CancellablePromise<void> {
     return $Call.ByID(2954204489);
 }
 
+/**
+ * FinishOnboarding records that the first-run tour was seen (Help menu shows it again).
+ */
+export function FinishOnboarding(): $CancellablePromise<void> {
+    return $Call.ByID(3125765738);
+}
+
 export function HideWindow(name: string): $CancellablePromise<void> {
     return $Call.ByID(3882925176, name);
+}
+
+/**
+ * NotificationsAllowed reports the macOS notification permission without prompting.
+ */
+export function NotificationsAllowed(): $CancellablePromise<boolean> {
+    return $Call.ByID(1162484456);
 }
 
 export function OpenBoard(): $CancellablePromise<void> {
@@ -62,6 +90,10 @@ export function Refresh(): $CancellablePromise<void> {
 
 export function SaveOrder(ids: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(2108905011, ids);
+}
+
+export function SetAutostart(on: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3011510521, on);
 }
 
 /**

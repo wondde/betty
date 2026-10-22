@@ -12,6 +12,7 @@ import type * as main$0 from "../../../../wondde/betty/models.js";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
+            "betty:command": string;
             "betty:quick-open": string;
             "betty:view": main$0.View;
         }
