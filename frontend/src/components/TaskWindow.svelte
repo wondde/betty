@@ -1,34 +1,46 @@
 <script lang="ts">
-  // The menu bar window: my tasks grouped by urgency, recent done, and an add field.
+  // Main window, Mac three-pane layout:
+  //   sidebar (my tasks · team · unassigned · review inbox · projects · people)
+  //   | list for that scope, with search (⌘F) and an add field
+  //   | detail pane for the selected task.
   import { onMount } from 'svelte'
   import { Events } from '@wailsio/runtime'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { BettyCommand } from '../../bindings/events'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
-  import { daysUntil, dayGroup, sortTasks, todayLabel } from '../lib/tasks'
+  import { nav } from '../lib/nav.svelte'
+  import { daysUntil, groupByStatus, matches, sortTasks, todayLabel } from '../lib/tasks'
+  import Sidebar from './Sidebar.svelte'
   import TaskCard from './TaskCard.svelte'
+  import TaskDetail from './TaskDetail.svelte'
+  import Inbox from './Inbox.svelte'
   import Composer from './Composer.svelte'
   import SignIn from './SignIn.svelte'
   import Onboarding from './Onboarding.svelte'
   import Sheet from './Sheet.svelte'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
-  let showDone = $state(false)
   let refreshing = $state(false)
   let toastTimer: ReturnType<typeof setTimeout>
   let composer = $state<Composer>()
+  let search = $state<HTMLInputElement>()
   let tour = $state(false)
   let sheet = $state<'settings' | 'shortcuts' | 'about' | null>(null)
 
-  // App menu commands (파일 · 보기 · 도움말 …) arrive from Go as "betty:command".
+  // App menu commands (파일 · 편집 · 보기 · 도움말 …) arrive from Go as "betty:command".
   onMount(() =>
     Events.On(BettyCommand, (e) => {
       const name = e.data as string
       if (name === 'new-task') {
         sheet = null
-        composer?.focus()
-      } else if (name === 'toggle-done') showDone = !showDone
+        if (nav.scope.kind === 'inbox') nav.scope = { kind: 'mine' }
+        queueMicrotask(() => composer?.focus())
+      } else if (name === 'search') {
+        sheet = null
+        search?.focus()
+        search?.select()
+      } else if (name === 'toggle-done') nav.showDone = !nav.showDone
       else if (name === 'onboarding') {
         sheet = null
         tour = true
@@ -37,32 +49,58 @@
   )
 
   const v = $derived(app.view)
+  const me = $derived(v.member?.id)
   const isNew = $derived(new Set(v.new ?? []))
-  const active = $derived(sortTasks((v.tickets ?? []).filter((t) => t.status !== 'done'), isNew, v.order ?? []))
-  const done = $derived((v.tickets ?? []).filter((t) => t.status === 'done').sort((a, b) => b.updated_at.localeCompare(a.updated_at)))
+  const all = $derived(v.tickets ?? [])
 
-  // Section headings make the urgency order scannable at a glance.
-  function section(t: Ticket): string {
-    const days = daysUntil(t.due_date)
-    if (days !== null && days <= 1) return '마감 임박'
-    if (isNew.has(t.id)) return '새로 들어온 일'
-    if (t.status === 'in_progress') return '진행 중'
-    if (t.status === 'blocked') return '막힘'
-    return '할 일'
-  }
+  const scopeTitle = $derived.by(() => {
+    const s = nav.scope
+    if (s.kind === 'mine') return '내 할 일'
+    if (s.kind === 'team') return '팀 전체'
+    if (s.kind === 'unassigned') return '담당자 없음'
+    if (s.kind === 'inbox') return '확인해 주세요'
+    if (s.kind === 'project') return v.projects?.find((p) => p.id === s.id)?.name ?? '프로젝트'
+    return v.members?.find((m) => m.id === s.id)?.name ?? '팀원'
+  })
+
+  const inScope = $derived.by(() => {
+    const s = nav.scope
+    return all.filter((t) => {
+      if (s.kind === 'mine') return t.assignee_id === me
+      if (s.kind === 'unassigned') return !t.assignee_id
+      if (s.kind === 'project') return t.project?.id === s.id
+      if (s.kind === 'member') return t.assignee_id === s.id
+      return true
+    })
+  })
+  const searching = $derived(nav.query.trim().length > 0)
+  const visible = $derived(
+    inScope.filter((t) => (nav.showDone || searching || t.status !== 'done') && matches(t, nav.query, v.members ?? [])),
+  )
+
+  // My list keeps the urgency order; other lists group by status.
   const groups = $derived.by(() => {
+    if (nav.scope.kind !== 'mine') return groupByStatus(visible)
+    const open = sortTasks(visible.filter((t) => t.status !== 'done'), isNew, v.order ?? [])
     const out: { title: string; items: Ticket[] }[] = []
-    for (const t of active) {
-      const title = section(t)
+    for (const t of open) {
+      const days = daysUntil(t.due_date)
+      const title = days !== null && days <= 1 ? '마감 임박' : isNew.has(t.id) ? '새로 들어온 일' : t.status === 'in_progress' ? '진행 중' : t.status === 'blocked' ? '막힘' : '할 일'
       if (out.at(-1)?.title !== title) out.push({ title, items: [] })
       out.at(-1)!.items.push(t)
     }
+    const done = visible.filter((t) => t.status === 'done').sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    if (done.length) out.push({ title: '완료', items: done })
     return out
   })
+  const flat = $derived(groups.flatMap((g) => g.items))
+  const selected = $derived(all.find((t) => t.id === nav.selected) ?? null)
+
   const summary = $derived.by(() => {
-    const urgent = active.filter((t) => (daysUntil(t.due_date) ?? 99) <= 1).length
-    const working = active.filter((t) => t.status === 'in_progress').length
-    return [`할 일 ${active.length}`, working && `진행 중 ${working}`, urgent && `마감 임박 ${urgent}`].filter(Boolean).join(' · ')
+    const open = inScope.filter((t) => t.status !== 'done')
+    const urgent = open.filter((t) => (daysUntil(t.due_date) ?? 99) <= 1).length
+    const working = open.filter((t) => t.status === 'in_progress').length
+    return [`남은 일 ${open.length}`, working && `진행 중 ${working}`, urgent && `마감 임박 ${urgent}`].filter(Boolean).join(' · ')
   })
   const synced = $derived(v.syncedAt ? new Date(v.syncedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '')
 
@@ -70,6 +108,11 @@
     toast = { text, ok }
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => (toast = null), 3200)
+  }
+
+  function select(t: Ticket) {
+    nav.selected = nav.selected === t.id ? null : t.id
+    if (isNew.has(t.id)) Betty.Acknowledge(t.id)
   }
 
   async function refresh() {
@@ -82,7 +125,27 @@
       refreshing = false
     }
   }
+
+  // ↑/↓ move the selection through the list; Esc clears search, then the selection.
+  function keydown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement
+    const typing = target.matches('input, textarea, select')
+    if (e.key === 'Escape') {
+      if (nav.query) nav.query = ''
+      else if (nav.selected) nav.selected = null
+      if (typing) target.blur()
+      return
+    }
+    if (typing || sheet || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
+    e.preventDefault()
+    const i = flat.findIndex((t) => t.id === nav.selected)
+    const next = e.key === 'ArrowDown' ? Math.min(flat.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1)
+    nav.selected = flat[next].id
+    document.querySelector(`[data-task="${flat[next].id}"]`)?.scrollIntoView({ block: 'nearest' })
+  }
 </script>
+
+<svelte:window onkeydown={keydown} />
 
 <div class="titlebar" aria-hidden="true"></div>
 {#if !v.signedIn}
@@ -90,64 +153,69 @@
 {:else if !v.onboarded || tour}
   <Onboarding ondone={() => (tour = false)} />
 {:else}
-  <div class="window">
-    <header>
-      <div>
-        <h1>오늘</h1>
-        <p class="date">{todayLabel()}</p>
-      </div>
-      <div class="tools">
-        <button onclick={refresh} class:spin={refreshing} title={synced ? `새로고침 · ${synced} 동기화` : '새로고침'} aria-label="새로고침">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" /></svg>
-        </button>
-        <button onclick={() => Betty.OpenBoard()} title="웹 보드 열기" aria-label="웹 보드 열기">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3.5v9.5H13V10M9 3h4v4M13 3L7.5 8.5" /></svg>
-        </button>
-      </div>
-    </header>
-    <p class="summary" class:urgent={summary.includes('마감 임박')}>{active.length ? summary : ''}</p>
-    {#if v.offline}<p class="offline">오프라인 · 마지막으로 불러온 목록이에요</p>{/if}
+  <div class="layout">
+    <Sidebar onsettings={() => (sheet = 'settings')} />
 
     <main>
-      {#each groups as g (g.title)}
-        <h2>{g.title}</h2>
-        <div class="list">
-          {#each g.items as t (t.id)}
-            <TaskCard ticket={t} isNew={isNew.has(t.id)} onerror={(m) => say(m)} />
-          {/each}
+      <header>
+        <div class="heading">
+          <h1>{scopeTitle}</h1>
+          <p class="sub">{nav.scope.kind === 'mine' ? todayLabel() + ' · ' : ''}{nav.scope.kind === 'inbox' ? '대화에서 찾은 일이에요. 맞으면 넣어 주세요.' : summary}</p>
         </div>
-      {:else}
-        <div class="empty">
-          <div class="big">🎉</div>
-          <p><b>지금 맡은 일이 없어요</b></p>
-          <p>새 업무가 배정되면 알림으로 알려 드릴게요.<br />직접 추가하려면 아래 입력창에 적거나 ⌘N을 누르세요.</p>
+        <div class="tools">
+          {#if nav.scope.kind !== 'inbox'}
+            <label class="search">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
+              <input bind:this={search} bind:value={nav.query} placeholder="검색 (⌘F)" aria-label="업무 검색" spellcheck="false" />
+            </label>
+            <button class="toggle" class:on={nav.showDone} onclick={() => (nav.showDone = !nav.showDone)} title="완료한 일 보기 (⇧⌘D)">완료 포함</button>
+          {/if}
+          <button class="icon" onclick={refresh} class:spin={refreshing} title={synced ? `새로고침 (⌘R) · ${synced} 동기화` : '새로고침 (⌘R)'} aria-label="새로고침">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3" /></svg>
+          </button>
         </div>
-      {/each}
+      </header>
+      {#if v.offline}<p class="offline">오프라인 · 마지막으로 불러온 내용이에요</p>{/if}
 
-      {#if done.length}
-        <button class="done-toggle" onclick={() => (showDone = !showDone)}>
-          {showDone ? '▾' : '▸'} 최근 완료 {done.length}
-        </button>
-        {#if showDone}
-          <ul class="done">
-            {#each done as t (t.id)}
-              <li>
-                <span class="tick">✓</span>
-                <span class="dtitle">{t.title}</span>
-                <span class="when">{dayGroup(t.updated_at)}</span>
-                <button onclick={() => Betty.SetStatus(t.id, 'todo').catch((e) => say(message(e)))} title="되돌리기" aria-label="할 일로 되돌리기">↺</button>
-              </li>
+      <section class="list">
+        {#if nav.scope.kind === 'inbox'}
+          <Inbox onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else}
+          {#each groups as g (g.title)}
+            <h2>{g.title} <span>{g.items.length}</span></h2>
+            {#each g.items as t (t.id)}
+              <div data-task={t.id}>
+                <TaskCard ticket={t} isNew={isNew.has(t.id)} selected={nav.selected === t.id} showAssignee={nav.scope.kind !== 'mine' && nav.scope.kind !== 'member'} onselect={() => select(t)} onerror={(m) => say(m)} />
+              </div>
             {/each}
-          </ul>
+          {:else}
+            <div class="empty">
+              {#if searching}
+                <p><b>"{nav.query}"에 맞는 업무가 없어요</b></p>
+                <p>완료한 일까지 함께 찾아봤어요.</p>
+              {:else}
+                <div class="big">🎉</div>
+                <p><b>남은 일이 없어요</b></p>
+                <p>{nav.scope.kind === 'mine' ? '새 업무가 배정되면 알림으로 알려 드릴게요.' : '이 목록에는 지금 할 일이 없어요.'}</p>
+              {/if}
+            </div>
+          {/each}
         {/if}
+      </section>
+
+      {#if nav.scope.kind !== 'inbox'}
+        <footer>
+          {#if toast}<p class="toast" class:ok={toast.ok}>{toast.text}</p>{/if}
+          <Composer bind:this={composer} onresult={(text, ok) => say(text, ok)} />
+        </footer>
+      {:else if toast}
+        <footer><p class="toast inline" class:ok={toast.ok}>{toast.text}</p></footer>
       {/if}
     </main>
 
-    <footer>
-      {#if toast}<p class="toast" class:ok={toast.ok}>{toast.text}</p>{/if}
-      <Composer bind:this={composer} onresult={(text, ok) => say(text, ok)} />
-      <p class="who">{v.member?.name} · ⌘N 새 할 일 · ⌥⌘N 어디서든 추가 · ⌘, 설정</p>
-    </footer>
+    {#if selected}
+      <TaskDetail ticket={selected} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+    {/if}
   </div>
   {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
 {/if}
@@ -155,36 +223,34 @@
 <style>
   /* The window keeps its traffic lights (hidden-inset title bar); this strip is where you drag it. */
   .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 40px; --wails-draggable: drag; z-index: 5; }
-  .window { height: 100%; display: flex; flex-direction: column; padding-top: 36px; }
-  header { display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 16px 0; }
+  .layout { height: 100%; display: flex; }
+  main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 44px 18px 8px; }
+  .heading { min-width: 0; }
   h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
-  .date { margin: 1px 0 0; font-size: 11.5px; color: var(--fg3); font-weight: 500; }
-  .tools { display: flex; gap: 4px; --wails-draggable: no-drag; }
-  .tools button { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; }
-  .tools button:hover { background: var(--fill-hover); }
-  .tools svg { width: 15px; height: 15px; fill: none; stroke: var(--fg2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .sub { margin: 2px 0 0; font-size: 11.5px; color: var(--fg3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tools { display: flex; align-items: center; gap: 6px; flex: none; position: relative; z-index: 6; }
+  .search { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 7px; background: var(--fill); width: 190px; }
+  .search:focus-within { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .search svg { width: 13px; height: 13px; fill: none; stroke: var(--fg3); stroke-width: 1.6; stroke-linecap: round; }
+  .search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font-size: 12.5px; }
+  .toggle { height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--fg2); background: var(--fill); }
+  .toggle.on { background: var(--accent); color: #fff; }
+  .icon { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; }
+  .icon:hover { background: var(--fill-hover); }
+  .icon svg { width: 15px; height: 15px; fill: none; stroke: var(--fg2); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .spin svg { animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .summary { margin: 6px 16px 0; min-height: 15px; font-size: 11.5px; font-weight: 600; color: var(--fg2); }
-  .summary.urgent { color: var(--orange); }
-  .offline { margin: 8px 16px 0; padding: 5px 10px; border-radius: 8px; background: var(--fill); font-size: 11px; color: var(--fg2); }
-  main { flex: 1; overflow-y: auto; padding: 4px 12px 8px; }
-  h2 { margin: 12px 4px 6px; font-size: 11px; font-weight: 700; color: var(--fg3); letter-spacing: 0.2px; }
-  .list { display: flex; flex-direction: column; gap: 6px; }
-  .empty { text-align: center; padding: 60px 20px 40px; color: var(--fg3); line-height: 1.6; }
+  .offline { margin: 0 18px 6px; padding: 5px 10px; border-radius: 8px; background: var(--fill); font-size: 11px; color: var(--fg2); }
+  .list { flex: 1; overflow-y: auto; padding: 0 10px 10px; }
+  h2 { margin: 14px 10px 4px; font-size: 11px; font-weight: 700; color: var(--fg3); }
+  h2 span { font-weight: 500; margin-left: 2px; }
+  .empty { text-align: center; padding: 70px 20px; color: var(--fg3); line-height: 1.6; }
   .empty p { margin: 4px 0; }
   .empty b { color: var(--fg); font-size: 14px; }
-  .empty .big { font-size: 34px; }
-  .done-toggle { margin: 14px 4px 4px; font-size: 11.5px; font-weight: 700; color: var(--fg3); }
-  .done { list-style: none; margin: 0; padding: 0 4px; }
-  .done li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 0.5px solid var(--line); font-size: 12px; color: var(--fg2); }
-  .tick { color: var(--green); font-weight: 700; }
-  .dtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: line-through; text-decoration-color: var(--fg3); }
-  .when { font-size: 10.5px; color: var(--fg3); }
-  .done button { width: 20px; height: 20px; border-radius: 5px; color: var(--fg3); }
-  .done button:hover { background: var(--fill-hover); color: var(--fg); }
-  footer { position: relative; padding: 8px 12px 10px; border-top: 0.5px solid var(--line); }
-  .who { margin: 6px 2px 0; font-size: 10.5px; color: var(--fg3); }
-  .toast { position: absolute; left: 12px; right: 12px; bottom: calc(100% + 6px); margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(30, 30, 32, 0.92); color: #fff; font-size: 12px; font-weight: 500; }
+  .empty .big { font-size: 32px; }
+  footer { position: relative; padding: 8px 14px 12px; border-top: 0.5px solid var(--line); }
+  .toast { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 6px); margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(30, 30, 32, 0.92); color: #fff; font-size: 12px; font-weight: 500; z-index: 4; }
+  .toast.inline { position: static; }
   .toast.ok { background: color-mix(in srgb, var(--green) 85%, black); }
 </style>

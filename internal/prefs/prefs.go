@@ -19,8 +19,8 @@ type Data struct {
 	Notified  []string     `json:"notified"`         // tasks already announced
 	Order     []string     `json:"order"`            // card order the user dragged
 	HintDone  bool         `json:"hint_done"`
-	Onboarded bool         `json:"onboarded"`          // finished the first-run tour
-	Snapshot  *berry.State `json:"snapshot,omitempty"` // last loaded state, shown offline
+	Onboarded bool         `json:"onboarded"`       // finished the first-run tour
+	Snapshot  *berry.Board `json:"board,omitempty"` // last loaded board, shown offline
 }
 
 type Store struct {
@@ -34,7 +34,11 @@ func Open() *Store {
 	if err != nil {
 		dir = os.TempDir()
 	}
-	s := &Store{path: filepath.Join(dir, "Betty", "prefs.json")}
+	folder := "Betty"
+	if os.Getenv("BETTY_SERVER") != "" {
+		folder = "Betty-dev" // a development server keeps its own settings and snapshot
+	}
+	s := &Store{path: filepath.Join(dir, folder, "prefs.json")}
 	if raw, err := os.ReadFile(s.path); err == nil {
 		_ = json.Unmarshal(raw, &s.data)
 	}

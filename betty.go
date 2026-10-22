@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.2.0"
+const version = "0.3.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -31,17 +31,21 @@ type View struct {
 	SignedIn  bool            `json:"signedIn"`
 	SigningIn bool            `json:"signingIn"`
 	Member    *berry.Member   `json:"member"`
-	Tickets   []berry.Ticket  `json:"tickets"`
+	Tickets   []berry.Ticket  `json:"tickets"` // every task on the board; mine have assignee_id == member.id
 	Members   []berry.Member  `json:"members"`
 	Projects  []berry.Project `json:"projects"`
-	New       []string        `json:"new"`
-	Order     []string        `json:"order"`
-	HintDone  bool            `json:"hintDone"`
-	Onboarded bool            `json:"onboarded"`
-	Version   string          `json:"version"`
-	Offline   bool            `json:"offline"`
-	SyncedAt  string          `json:"syncedAt"`
-	Server    string          `json:"server"`
+	// The review inbox ("확인해 주세요")
+	Proposals        []berry.Proposal        `json:"proposals"`
+	MeetingProposals []berry.MeetingProposal `json:"meetingProposals"`
+	DesignQuestions  []berry.DesignQuestion  `json:"designQuestions"`
+	New              []string                `json:"new"` // my open tasks not looked at yet
+	Order            []string                `json:"order"`
+	HintDone         bool                    `json:"hintDone"`
+	Onboarded        bool                    `json:"onboarded"`
+	Version          string                  `json:"version"`
+	Offline          bool                    `json:"offline"`
+	SyncedAt         string                  `json:"syncedAt"`
+	Server           string                  `json:"server"`
 }
 
 // Betty is the one service the frontend talks to. Network, Keychain, notifications and
@@ -86,11 +90,12 @@ func (b *Betty) View() View {
 	}
 	b.mu.Unlock()
 	if s := d.Snapshot; s != nil && v.SignedIn {
-		member := s.Member
-		v.Member, v.Tickets, v.Members, v.Projects = &member, s.Tickets, s.Members, s.Projects
+		v.Member = &berry.Member{ID: s.User.ID, Name: s.User.Name}
+		v.Tickets, v.Members, v.Projects = s.Tasks(), s.Members, s.Projects
+		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
 		seen := toSet(d.Seen)
-		for _, t := range s.Tickets {
-			if t.Status != "done" && !seen[t.ID] {
+		for _, t := range mine(s) {
+			if !seen[t.ID] {
 				v.New = append(v.New, t.ID)
 			}
 		}
@@ -101,6 +106,17 @@ func (b *Betty) View() View {
 	return v
 }
 
+// mine lists my open tasks on the board.
+func mine(s *berry.Board) []berry.BoardTicket {
+	var out []berry.BoardTicket
+	for _, t := range s.Tickets {
+		if t.Status != "done" && t.AssigneeID != nil && *t.AssigneeID == s.User.ID {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
 func (b *Betty) emit() {
 	v := b.View()
 	if app := application.Get(); app != nil {
@@ -108,10 +124,8 @@ func (b *Betty) emit() {
 	}
 	if b.onCount != nil {
 		open := 0
-		for _, t := range v.Tickets {
-			if t.Status != "done" {
-				open++
-			}
+		if s := b.prefs.Get().Snapshot; s != nil && v.SignedIn {
+			open = len(mine(s))
 		}
 		b.onCount(open)
 	}
@@ -131,12 +145,16 @@ func (b *Betty) poll(ctx context.Context) {
 			if vault.Token() == "" {
 				continue
 			}
-			rev, err := b.client.Revision(ctx)
+			rev, err := b.client.BoardRevision(ctx)
 			b.mu.Lock()
 			same := err == nil && rev == b.revision
 			b.mu.Unlock()
 			if err != nil {
-				b.handle(err)
+				if errors.Is(err, berry.ErrUnauthorized) {
+					_ = b.Refresh() // decides between "server too old" and a revoked token
+				} else {
+					b.handle(err)
+				}
 				continue
 			}
 			if !same {
@@ -146,7 +164,7 @@ func (b *Betty) poll(ctx context.Context) {
 	}
 }
 
-// Refresh reloads my tasks now.
+// Refresh reloads the board now.
 func (b *Betty) Refresh() error {
 	if vault.Token() == "" {
 		b.emit()
@@ -154,22 +172,30 @@ func (b *Betty) Refresh() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	state, err := b.client.State(ctx)
+	board, err := b.client.Board(ctx)
+	if errors.Is(err, berry.ErrUnauthorized) {
+		// A server that predates board access for device tokens answers 401 here while the
+		// token is still fine; only a token the widget API also rejects really signs us out.
+		if _, werr := b.client.State(ctx); werr == nil {
+			return errors.New("BerryTicket 서버 업데이트가 필요해요. 관리자에게 알려 주세요")
+		}
+	}
 	if err != nil {
 		return b.handle(err)
 	}
+	if board.User.ID == "" {
+		return errors.New("팀원 계정으로 로그인해 주세요")
+	}
 	b.mu.Lock()
-	b.revision, b.offline, b.syncedAt = state.Revision, false, time.Now()
+	b.revision, b.offline, b.syncedAt = board.Revision, false, time.Now()
 	b.mu.Unlock()
 
-	var announce []berry.Ticket
+	var announce []berry.BoardTicket
 	b.prefs.Update(func(d *prefs.Data) {
 		first := d.Snapshot == nil && len(d.Seen) == 0
 		var open []string
-		for _, t := range state.Tickets {
-			if t.Status != "done" {
-				open = append(open, t.ID)
-			}
+		for _, t := range mine(&board) {
+			open = append(open, t.ID)
 		}
 		if first {
 			// Everything on the list at first sign-in is not "new".
@@ -177,8 +203,8 @@ func (b *Betty) Refresh() error {
 			d.Notified = prefs.Remember(d.Notified, open...)
 		} else {
 			notified := toSet(d.Notified)
-			for _, t := range state.Tickets {
-				if t.Status != "done" && !notified[t.ID] {
+			for _, t := range mine(&board) {
+				if !notified[t.ID] {
 					announce = append(announce, t)
 				}
 			}
@@ -186,7 +212,7 @@ func (b *Betty) Refresh() error {
 				d.Notified = prefs.Remember(d.Notified, t.ID)
 			}
 		}
-		snapshot := state
+		snapshot := board
 		d.Snapshot = &snapshot
 	})
 	b.announce(announce)
@@ -194,7 +220,7 @@ func (b *Betty) Refresh() error {
 	return nil
 }
 
-func (b *Betty) announce(tickets []berry.Ticket) {
+func (b *Betty) announce(tickets []berry.BoardTicket) {
 	if len(tickets) == 0 || b.notify == nil {
 		return
 	}
@@ -240,7 +266,7 @@ func (b *Betty) handle(err error) error {
 
 // ---------- tasks ----------
 
-func (b *Betty) ticket(id string) (berry.Ticket, bool) {
+func (b *Betty) boardTicket(id string) (berry.BoardTicket, bool) {
 	if s := b.prefs.Get().Snapshot; s != nil {
 		for _, t := range s.Tickets {
 			if t.ID == id {
@@ -248,18 +274,19 @@ func (b *Betty) ticket(id string) (berry.Ticket, bool) {
 			}
 		}
 	}
-	return berry.Ticket{}, false
+	return berry.BoardTicket{}, false
 }
 
-// SetStatus changes one of my tasks: todo | in_progress | blocked | done.
-func (b *Betty) SetStatus(id, status string) (berry.Ticket, error) {
-	t, ok := b.ticket(id)
+// Update changes any task's fields (title, description, status, priority, assignee_id,
+// due_date, project_id, area), based on the version last loaded. A conflict reloads the board.
+func (b *Betty) Update(id string, changes map[string]any) (berry.Ticket, error) {
+	t, ok := b.boardTicket(id)
 	if !ok {
 		return berry.Ticket{}, errors.New("업무를 찾지 못했어요. 새로고침해 주세요")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	updated, err := b.client.SetStatus(ctx, t, status)
+	updated, err := b.client.UpdateTicket(ctx, id, t.UpdatedAt, changes)
 	if err != nil {
 		var api *berry.APIError
 		if errors.As(err, &api) && api.Status == 409 {
@@ -267,6 +294,7 @@ func (b *Betty) SetStatus(id, status string) (berry.Ticket, error) {
 		}
 		return berry.Ticket{}, b.handle(err)
 	}
+	var project *berry.Project
 	b.prefs.Update(func(d *prefs.Data) {
 		d.Seen = prefs.Remember(d.Seen, id)
 		if d.Snapshot == nil {
@@ -277,9 +305,28 @@ func (b *Betty) SetStatus(id, status string) (berry.Ticket, error) {
 				d.Snapshot.Tickets[i] = updated
 			}
 		}
+		for i := range d.Snapshot.Projects {
+			if d.Snapshot.Projects[i].ID == updated.ProjectID {
+				project = &d.Snapshot.Projects[i]
+			}
+		}
 	})
 	b.emit()
-	return updated, nil
+	return updated.Ticket(project), nil
+}
+
+// SetStatus is Update with only the status: todo | in_progress | blocked | done.
+func (b *Betty) SetStatus(id, status string) (berry.Ticket, error) {
+	return b.Update(id, map[string]any{"status": status})
+}
+
+// Claim makes a task mine ("내가 할게").
+func (b *Betty) Claim(id string) (berry.Ticket, error) {
+	s := b.prefs.Get().Snapshot
+	if s == nil {
+		return berry.Ticket{}, errors.New("새로고침한 뒤 다시 해 주세요")
+	}
+	return b.Update(id, map[string]any{"assignee_id": s.User.ID})
 }
 
 // Create adds a task (mine, or a teammate's when AssigneeID is set).
@@ -290,19 +337,49 @@ func (b *Betty) Create(in berry.CreateInput) (berry.Ticket, error) {
 	if err != nil {
 		return berry.Ticket{}, b.handle(err)
 	}
-	mine := in.AssigneeID == nil
-	if s := b.prefs.Get().Snapshot; s != nil && in.AssigneeID != nil && *in.AssigneeID == s.Member.ID {
-		mine = true
-	}
 	b.prefs.Update(func(d *prefs.Data) {
 		d.Seen = prefs.Remember(d.Seen, created.ID) // my own task is never "new"
 		d.Notified = prefs.Remember(d.Notified, created.ID)
-		if mine && d.Snapshot != nil {
-			d.Snapshot.Tickets = append([]berry.Ticket{created}, d.Snapshot.Tickets...)
-		}
 	})
-	b.emit()
+	go b.Refresh()
 	return created, nil
+}
+
+// ---------- review inbox ----------
+
+// ApproveProposal adds a proposed task. projectID is needed only when the proposal's
+// project is unconfirmed (payload._routing.confirmed == false).
+func (b *Betty) ApproveProposal(id, projectID string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.ApproveProposal(ctx, id, projectID) })
+}
+
+func (b *Betty) DismissProposal(id string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.DismissProposal(ctx, id) })
+}
+
+func (b *Betty) ApproveMeeting(id, projectID string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.ApproveMeeting(ctx, id, projectID) })
+}
+
+func (b *Betty) DismissMeeting(id string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.DismissMeeting(ctx, id) })
+}
+
+func (b *Betty) DismissDesignQuestion(id string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.DismissDesignQuestion(ctx, id) })
+}
+
+func (b *Betty) inbox(call func(context.Context) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := call(ctx); err != nil {
+		var api *berry.APIError
+		if errors.As(err, &api) && api.Status == 409 {
+			_ = b.Refresh()
+		}
+		return b.handle(err)
+	}
+	return b.Refresh()
 }
 
 func (b *Betty) Acknowledge(id string) {

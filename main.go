@@ -15,6 +15,7 @@ import (
 	"embed"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -34,10 +35,18 @@ const (
 	showTasksShortcut = "CmdOrCtrl+Alt+B"
 )
 
+// A development server (BETTY_SERVER) runs as its own instance next to the real Betty.
+func instanceID() string {
+	if os.Getenv("BETTY_SERVER") != "" {
+		return "com.blueberryteam.betty.dev"
+	}
+	return "com.blueberryteam.betty"
+}
+
 func init() {
 	application.RegisterEvent[View]("betty:view")
 	application.RegisterEvent[string]("betty:quick-open")
-	// about | new-task | settings | onboarding | toggle-done | shortcuts
+	// about | new-task | search | settings | onboarding | toggle-done | shortcuts
 	application.RegisterEvent[string]("betty:command")
 }
 
@@ -60,7 +69,7 @@ func main() {
 			ApplicationShouldTerminateAfterLastWindowClosed: false,
 		},
 		SingleInstance: &application.SingleInstanceOptions{
-			UniqueID: "com.blueberryteam.betty",
+			UniqueID: instanceID(),
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
 				if showTasks != nil {
 					showTasks()
@@ -73,9 +82,9 @@ func main() {
 	tasks := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:      "main",
 		Title:     "Betty",
-		Width:     420,
-		Height:    680,
-		MinWidth:  360,
+		Width:     1040,
+		Height:    700,
+		MinWidth:  760,
 		MinHeight: 480,
 		Mac: application.MacWindow{
 			Backdrop:                application.MacBackdropTranslucent,
@@ -176,6 +185,8 @@ func main() {
 		item("붙여넣기", application.NewPasteMenuItem()),
 		item("전체 선택", application.NewSelectAllMenuItem()),
 	))
+	editMenu.AddSeparator()
+	editMenu.Add("찾기").SetAccelerator("CmdOrCtrl+F").OnClick(func(*application.Context) { command("search") })
 
 	viewMenu := menu.AddSubmenu("보기")
 	viewMenu.Add("최근 완료 보기/숨기기").SetAccelerator("CmdOrCtrl+Shift+D").OnClick(func(*application.Context) { command("toggle-done") })

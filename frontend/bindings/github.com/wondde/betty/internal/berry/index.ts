@@ -3,7 +3,13 @@
 
 export type {
     CreateInput,
+    DesignQuestion,
+    MeetingPayload,
+    MeetingProposal,
     Member,
     Project,
+    Proposal,
+    ProposalPayload,
+    Routing,
     Ticket
 } from "./models.js";

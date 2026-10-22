@@ -13,9 +13,24 @@ export interface View {
     "signedIn": boolean;
     "signingIn": boolean;
     "member": berry$0.Member | null;
+
+    /**
+     * every task on the board; mine have assignee_id == member.id
+     */
     "tickets": berry$0.Ticket[] | null;
     "members": berry$0.Member[] | null;
     "projects": berry$0.Project[] | null;
+
+    /**
+     * The review inbox ("확인해 주세요")
+     */
+    "proposals": berry$0.Proposal[] | null;
+    "meetingProposals": berry$0.MeetingProposal[] | null;
+    "designQuestions": berry$0.DesignQuestion[] | null;
+
+    /**
+     * my open tasks not looked at yet
+     */
     "new": string[] | null;
     "order": string[] | null;
     "hintDone": boolean;

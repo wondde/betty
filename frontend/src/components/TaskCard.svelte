@@ -1,20 +1,28 @@
 <script lang="ts">
-  // One task. Reminders-style circle to complete (with a short undo window),
-  // ▶/❚❚ to start or pause, click to open details and actions.
+  // One task row. Reminders-style circle to complete (short undo window), ▶/❚❚ to start or
+  // pause; clicking the row selects it and opens the detail pane.
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
-  import { dueOf, statusLabel } from '../lib/tasks'
-  import { message } from '../lib/view.svelte'
+  import { dueOf, statusLabel, initial } from '../lib/tasks'
+  import { app, message } from '../lib/view.svelte'
 
-  let { ticket, isNew = false, onerror }: { ticket: Ticket; isNew?: boolean; onerror: (m: string) => void } = $props()
+  let {
+    ticket,
+    isNew = false,
+    selected = false,
+    showAssignee = false,
+    onselect,
+    onerror,
+  }: { ticket: Ticket; isNew?: boolean; selected?: boolean; showAssignee?: boolean; onselect: () => void; onerror: (m: string) => void } = $props()
 
-  let open = $state(false)
   let finishing = $state(false)
   let busy = $state(false)
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const due = $derived(dueOf(ticket))
+  const done = $derived(ticket.status === 'done')
   const working = $derived(ticket.status === 'in_progress')
+  const assignee = $derived(app.view.members?.find((m) => m.id === ticket.assignee_id))
 
   async function set(status: string) {
     busy = true
@@ -28,7 +36,9 @@
   }
 
   // Completing waits 1.6s so a mis-click can be undone by clicking the circle again.
-  function toggleDone() {
+  function toggleDone(e: MouseEvent) {
+    e.stopPropagation()
+    if (done) return void set('todo')
     if (finishing) {
       clearTimeout(timer)
       finishing = false
@@ -40,32 +50,30 @@
       finishing = false
     }, 1600)
   }
-
-  function toggleOpen() {
-    open = !open
-    if (isNew) Betty.Acknowledge(ticket.id)
-  }
 </script>
 
-<article class="card" class:open class:finishing class:isNew>
-  <button class="check" class:on={finishing} onclick={toggleDone} aria-label={finishing ? '완료 취소' : `완료: ${ticket.title}`} title={finishing ? '되돌리기' : '완료'}>
+<article class="row" class:selected class:finishing class:done class:isNew>
+  <button class="check" class:on={finishing || done} onclick={toggleDone} aria-label={done ? '다시 할 일로' : finishing ? '완료 취소' : `완료: ${ticket.title}`} title={done ? '다시 할 일로' : finishing ? '되돌리기' : '완료'}>
     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" /><path d="M6 10.4l2.7 2.6L14.2 7.4" /></svg>
   </button>
 
-  <div class="body" role="button" tabindex="0" onclick={toggleOpen} onkeydown={(e) => e.key === 'Enter' && toggleOpen()}>
+  <div class="body" role="button" tabindex="-1" onclick={onselect} onkeydown={(e) => e.key === 'Enter' && onselect()}>
     <div class="title">{ticket.title}</div>
     <div class="meta">
       <span class="num">BT-{ticket.number}</span>
       {#if isNew}<span class="new">NEW</span>{/if}
       {#if ticket.project}<span class="project"><i style:background={ticket.project.color}></i>{ticket.project.name}</span>{/if}
-      {#if ticket.status === 'in_progress' || ticket.status === 'blocked'}<span class="status {ticket.status}">{statusLabel[ticket.status]}</span>{/if}
+      {#if working || ticket.status === 'blocked'}<span class="status {ticket.status}">{statusLabel[ticket.status]}</span>{/if}
+      {#if ticket.priority === 'urgent' || ticket.priority === 'high'}<span class="prio {ticket.priority}">{ticket.priority === 'urgent' ? '긴급' : '중요'}</span>{/if}
       {#if due}<span class="due {due.tone}">{due.label}</span>{/if}
     </div>
-    {#if !open && ticket.description}<div class="preview">{ticket.description}</div>{/if}
   </div>
 
-  {#if ticket.status !== 'blocked'}
-    <button class="quick" class:working onclick={() => set(working ? 'todo' : 'in_progress')} disabled={busy} title={working ? '할 일로 되돌리기' : '시작하기'} aria-label={working ? '할 일로 되돌리기' : '시작하기'}>
+  {#if showAssignee}
+    <span class="who" title={assignee?.name ?? '담당자 없음'} class:none={!assignee}>{assignee ? initial(assignee.name) : '?'}</span>
+  {/if}
+  {#if !done && ticket.status !== 'blocked'}
+    <button class="quick" class:working onclick={(e) => (e.stopPropagation(), set(working ? 'todo' : 'in_progress'))} disabled={busy} title={working ? '할 일로 되돌리기' : '시작하기'} aria-label={working ? '할 일로 되돌리기' : '시작하기'}>
       {#if working}
         <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2" width="2.4" height="8" rx="0.6" /><rect x="7.1" y="2" width="2.4" height="8" rx="0.6" /></svg>
       {:else}
@@ -73,42 +81,24 @@
       {/if}
     </button>
   {/if}
-
-  {#if open}
-    <div class="details">
-      <p class="desc" class:muted={!ticket.description}>{ticket.description || '설명이 없어요'}</p>
-      <div class="actions">
-        {#if ticket.status === 'blocked'}
-          <button onclick={() => set('in_progress')} disabled={busy}>다시 진행</button>
-        {:else}
-          <button onclick={() => set(working ? 'todo' : 'in_progress')} disabled={busy}>{working ? '할 일로' : '시작할게'}</button>
-          <button onclick={() => set('blocked')} disabled={busy}>막혔어요</button>
-        {/if}
-        {#if ticket.source_url}<button onclick={() => Betty.OpenURL(ticket.source_url)}>원문 ↗</button>{/if}
-        <button onclick={() => Betty.OpenBoard()}>보드 ↗</button>
-      </div>
-    </div>
-  {/if}
 </article>
 
 <style>
-  .card {
-    display: grid; grid-template-columns: 22px 1fr auto; column-gap: 10px; align-items: start;
-    padding: 10px 10px 10px 10px; border-radius: 12px; background: var(--card);
-    box-shadow: 0 0 0 0.5px var(--line); transition: opacity 0.3s ease;
-  }
-  .card.isNew { box-shadow: 0 0 0 0.5px var(--line), inset 3px 0 0 var(--accent); }
-  .card.finishing { opacity: 0.55; }
-  .card.finishing .title { text-decoration: line-through; }
-  .check { width: 20px; height: 20px; margin-top: 1px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; }
+  .row:hover { background: var(--fill); }
+  .row.selected { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .row.isNew .title::before { content: ''; display: inline-block; width: 7px; height: 7px; margin: 0 6px 1px 0; border-radius: 50%; background: var(--accent); }
+  .row.finishing, .row.done { opacity: 0.55; }
+  .row.finishing .title, .row.done .title { text-decoration: line-through; }
+  .check { width: 20px; height: 20px; flex: none; }
   .check svg { width: 20px; height: 20px; fill: none; stroke: var(--fg3); stroke-width: 1.4; }
   .check path { stroke: transparent; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .check:hover circle { stroke: var(--accent); }
   .check.on circle { fill: var(--accent); stroke: var(--accent); }
   .check.on path { stroke: #fff; }
-  .body { min-width: 0; outline: none; }
-  .title { font-size: 13.5px; font-weight: 600; line-height: 1.35; word-break: break-word; }
-  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; margin-top: 3px; font-size: 11px; color: var(--fg3); }
+  .body { flex: 1; min-width: 0; outline: none; cursor: default; }
+  .title { font-size: 13px; font-weight: 500; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 2px; font-size: 11px; color: var(--fg3); }
   .num { font-variant-numeric: tabular-nums; font-weight: 600; }
   .new { padding: 0 5px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 9.5px; font-weight: 800; }
   .project { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); }
@@ -116,23 +106,18 @@
   .status { padding: 0 6px; border-radius: 5px; font-weight: 600; }
   .status.in_progress { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .status.blocked { color: var(--red); background: color-mix(in srgb, var(--red) 13%, transparent); }
+  .prio { font-weight: 700; }
+  .prio.urgent { color: var(--red); }
+  .prio.high { color: var(--orange); }
   .due { font-weight: 600; }
   .due.overdue, .due.today { color: var(--red); }
   .due.soon { color: var(--orange); }
-  .preview { margin-top: 4px; font-size: 12px; color: var(--fg2); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .quick {
-    width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; align-self: center;
-    background: var(--fill); opacity: 0; transition: opacity 0.15s ease;
-  }
+  .who { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; background: var(--fill-hover); color: var(--fg2); }
+  .who.none { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--fg3); }
+  .quick { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--fill); opacity: 0; }
   .quick svg { width: 10px; height: 10px; fill: var(--fg2); }
-  .card:hover .quick, .quick:focus-visible, .quick.working { opacity: 1; }
+  .row:hover .quick, .quick:focus-visible, .quick.working { opacity: 1; }
   .quick.working svg { fill: var(--accent); }
   .quick:hover { background: var(--fill-hover); }
-  .details { grid-column: 2 / 4; margin-top: 8px; }
-  .desc { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--fill); font-size: 12px; line-height: 1.5; white-space: pre-wrap; max-height: 150px; overflow-y: auto; user-select: text; -webkit-user-select: text; }
-  .desc.muted { color: var(--fg3); }
-  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .actions button { padding: 3px 10px; border-radius: 6px; background: var(--fill); font-size: 11.5px; font-weight: 600; }
-  .actions button:hover { background: var(--fill-hover); }
   button:disabled { opacity: 0.5; }
 </style>

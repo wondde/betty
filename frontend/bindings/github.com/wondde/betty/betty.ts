@@ -30,6 +30,18 @@ export function AllowNotifications(): $CancellablePromise<boolean> {
     return $Call.ByID(3353362703);
 }
 
+export function ApproveMeeting(id: string, projectID: string): $CancellablePromise<void> {
+    return $Call.ByID(678130410, id, projectID);
+}
+
+/**
+ * ApproveProposal adds a proposed task. projectID is needed only when the proposal's
+ * project is unconfirmed (payload._routing.confirmed == false).
+ */
+export function ApproveProposal(id: string, projectID: string): $CancellablePromise<void> {
+    return $Call.ByID(54284815, id, projectID);
+}
+
 /**
  * Autostart reports whether Betty opens at login.
  */
@@ -42,14 +54,33 @@ export function CancelSignIn(): $CancellablePromise<void> {
 }
 
 /**
+ * Claim makes a task mine ("내가 할게").
+ */
+export function Claim(id: string): $CancellablePromise<berry$0.Ticket> {
+    return $Call.ByID(1685933288, id);
+}
+
+/**
  * Create adds a task (mine, or a teammate's when AssigneeID is set).
  */
 export function Create($in: berry$0.CreateInput): $CancellablePromise<berry$0.Ticket> {
     return $Call.ByID(1299547056, $in);
 }
 
+export function DismissDesignQuestion(id: string): $CancellablePromise<void> {
+    return $Call.ByID(3883525622, id);
+}
+
 export function DismissHint(): $CancellablePromise<void> {
     return $Call.ByID(2954204489);
+}
+
+export function DismissMeeting(id: string): $CancellablePromise<void> {
+    return $Call.ByID(198382625, id);
+}
+
+export function DismissProposal(id: string): $CancellablePromise<void> {
+    return $Call.ByID(2562414710, id);
 }
 
 /**
@@ -82,7 +113,7 @@ export function OpenURL(link: string): $CancellablePromise<void> {
 }
 
 /**
- * Refresh reloads my tasks now.
+ * Refresh reloads the board now.
  */
 export function Refresh(): $CancellablePromise<void> {
     return $Call.ByID(1750633071);
@@ -97,7 +128,7 @@ export function SetAutostart(on: boolean): $CancellablePromise<void> {
 }
 
 /**
- * SetStatus changes one of my tasks: todo | in_progress | blocked | done.
+ * SetStatus is Update with only the status: todo | in_progress | blocked | done.
  */
 export function SetStatus(id: string, status: string): $CancellablePromise<berry$0.Ticket> {
     return $Call.ByID(796581622, id, status);
@@ -122,6 +153,14 @@ export function SignIn(): $CancellablePromise<void> {
  */
 export function SignOut(): $CancellablePromise<void> {
     return $Call.ByID(3861533215);
+}
+
+/**
+ * Update changes any task's fields (title, description, status, priority, assignee_id,
+ * due_date, project_id, area), based on the version last loaded. A conflict reloads the board.
+ */
+export function Update(id: string, changes: { [_ in string]?: any } | null): $CancellablePromise<berry$0.Ticket> {
+    return $Call.ByID(4288913317, id, changes);
 }
 
 export function View(): $CancellablePromise<$models.View> {

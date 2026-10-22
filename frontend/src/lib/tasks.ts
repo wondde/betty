@@ -57,3 +57,38 @@ export function dayGroup(iso: string): string {
   if (diff === 1) return '어제'
   return `${d.getMonth() + 1}월 ${d.getDate()}일`
 }
+
+export const priorityLabel: Record<string, string> = { low: '낮음', normal: '보통', high: '높음', urgent: '긴급' }
+export const areaLabel: Record<string, string> = { '': '정하지 않음', engineering: '개발', design: '디자인', marketing: '마케팅' }
+
+type Named = { id: string; name: string }
+
+// Search across BT number, title, description, assignee and project names.
+export function matches(t: Ticket, query: string, members: Named[]): boolean {
+  const q = query.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!q) return true
+  const who = members.find((m) => m.id === t.assignee_id)?.name ?? ''
+  const hay = `bt-${t.number} bt${t.number} ${t.title} ${t.description} ${who} ${t.project?.name ?? ''}`.toLowerCase()
+  return q.split(' ').every((word) => hay.includes(word))
+}
+
+const statusOrder: Record<string, number> = { in_progress: 0, blocked: 1, todo: 2, done: 3 }
+const statusTitle: Record<string, string> = { in_progress: '진행 중', blocked: '막힘', todo: '할 일', done: '완료' }
+
+// Team-style grouping: by status, nearest deadline first inside each group.
+export function groupByStatus(tickets: Ticket[]): { title: string; items: Ticket[] }[] {
+  const sorted = tickets.slice().sort((a, b) =>
+    statusOrder[a.status] - statusOrder[b.status] || (daysUntil(a.due_date) ?? 9999) - (daysUntil(b.due_date) ?? 9999) || b.number - a.number)
+  const out: { title: string; items: Ticket[] }[] = []
+  for (const t of sorted) {
+    const title = statusTitle[t.status] ?? t.status
+    if (out.at(-1)?.title !== title) out.push({ title, items: [] })
+    out.at(-1)!.items.push(t)
+  }
+  return out
+}
+
+// Initial for the little avatar dot next to a task.
+export function initial(name?: string): string {
+  return name ? Array.from(name)[0] : ''
+}

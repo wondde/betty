@@ -4,12 +4,21 @@ package vault
 
 import (
 	"errors"
+	"os"
 
 	"github.com/zalando/go-keyring"
 )
 
-const service = "com.blueberryteam.betty"
 const account = "device-token"
+
+// service is separate for a development server (BETTY_SERVER), so testing never touches
+// the real sign-in.
+var service = func() string {
+	if os.Getenv("BETTY_SERVER") != "" {
+		return "com.blueberryteam.betty.dev"
+	}
+	return "com.blueberryteam.betty"
+}()
 
 func Token() string {
 	t, err := keyring.Get(service, account)

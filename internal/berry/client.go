@@ -37,6 +37,8 @@ type Ticket struct {
 	UpdatedAt   string   `json:"updated_at"`
 	Project     *Project `json:"project"`
 	AssigneeID  *string  `json:"assignee_id,omitempty"`
+	Area        string   `json:"area,omitempty"`
+	CreatedAt   string   `json:"created_at,omitempty"`
 }
 
 type State struct {

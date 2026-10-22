@@ -11,6 +11,32 @@ export interface CreateInput {
     "due_date"?: string;
 }
 
+export interface DesignQuestion {
+    "id": string;
+    "question": string;
+    "reason": string;
+    "url": string;
+}
+
+export interface MeetingPayload {
+    "title": string;
+    "date": string;
+    "start_time": string;
+    "end_time": string;
+    "location": string;
+    "source_url": string;
+    "status": string;
+    "_routing"?: Routing | null;
+}
+
+export interface MeetingProposal {
+    "id": string;
+    "kind": string;
+    "project_id": string;
+    "payload": MeetingPayload;
+    "reason": string;
+}
+
 export interface Member {
     "id": string;
     "name": string;
@@ -20,6 +46,41 @@ export interface Project {
     "id": string;
     "name": string;
     "color": string;
+}
+
+/**
+ * Proposal is a task the assistant found in a conversation and wants confirmed.
+ */
+export interface Proposal {
+    "id": string;
+
+    /**
+     * create | update
+     */
+    "kind": string;
+    "project_id": string;
+    "ticket_id": string | null;
+    "payload": ProposalPayload;
+    "reason": string;
+    "created_at": string;
+}
+
+export interface ProposalPayload {
+    "title": string;
+    "description": string;
+    "status": string;
+    "assignee_id": string | null;
+    "due_date": string | null;
+    "source_url": string;
+    "_routing"?: Routing | null;
+}
+
+/**
+ * Routing.Confirmed == false means the project still has to be chosen before approving.
+ */
+export interface Routing {
+    "confirmed": boolean | null;
+    "reason": string;
 }
 
 export interface Ticket {
@@ -38,4 +99,6 @@ export interface Ticket {
     "updated_at": string;
     "project": Project | null;
     "assignee_id"?: string | null;
+    "area"?: string;
+    "created_at"?: string;
 }
