@@ -23,6 +23,10 @@ export function Acknowledge(id: string): $CancellablePromise<void> {
     return $Call.ByID(121669712, id);
 }
 
+export function AddRepo(fullName: string, projectID: string): $CancellablePromise<void> {
+    return $Call.ByID(3364126919, fullName, projectID);
+}
+
 /**
  * AllowNotifications shows the macOS permission prompt (once; later it only reports).
  */
@@ -102,6 +106,13 @@ export function History(cursor: string, status: string): $CancellablePromise<ber
 }
 
 /**
+ * LinkGitHub marks a task and a GitHub issue/PR as the same work (or unlinks with remove).
+ */
+export function LinkGitHub(ticketID: string, repoID: string, $number: number, allowShared: boolean, remove: boolean): $CancellablePromise<void> {
+    return $Call.ByID(111700011, ticketID, repoID, $number, allowShared, remove);
+}
+
+/**
  * NotificationsAllowed reports the macOS notification permission without prompting.
  */
 export function NotificationsAllowed(): $CancellablePromise<boolean> {
@@ -126,6 +137,14 @@ export function Refresh(): $CancellablePromise<void> {
     return $Call.ByID(1750633071);
 }
 
+export function RejectGitHub(ticketID: string, repoID: string, $number: number): $CancellablePromise<void> {
+    return $Call.ByID(2227657548, ticketID, repoID, $number);
+}
+
+export function RemoveRepo(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1208628432, id);
+}
+
 /**
  * SaveMeeting creates a meeting (id "") or edits one; editing is based on the version last loaded.
  */
@@ -133,12 +152,24 @@ export function SaveMeeting(id: string, $in: berry$0.MeetingInput): $Cancellable
     return $Call.ByID(563081758, id, $in);
 }
 
+export function SaveMember(id: string, $in: berry$0.MemberInput): $CancellablePromise<void> {
+    return $Call.ByID(2946904991, id, $in);
+}
+
 export function SaveOrder(ids: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(2108905011, ids);
 }
 
+export function SaveProject(id: string, name: string, channelIDs: string[] | null): $CancellablePromise<void> {
+    return $Call.ByID(3217617098, id, name, channelIDs);
+}
+
 export function SetAutostart(on: boolean): $CancellablePromise<void> {
     return $Call.ByID(3011510521, on);
+}
+
+export function SetSetting(key: string, on: boolean): $CancellablePromise<void> {
+    return $Call.ByID(2235119384, key, on);
 }
 
 /**

@@ -21,8 +21,10 @@ type Project struct {
 }
 
 type Member struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	DiscordID string `json:"discord_id,omitempty"`
+	ChannelID string `json:"channel_id,omitempty"` // personal work channel
 }
 
 type Ticket struct {

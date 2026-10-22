@@ -18,6 +18,8 @@
   import Calendar from './Calendar.svelte'
   import History from './History.svelte'
   import TeamStatus from './TeamStatus.svelte'
+  import GitHubView from './GitHubView.svelte'
+  import AdminView from './AdminView.svelte'
   import Composer from './Composer.svelte'
   import SignIn from './SignIn.svelte'
   import Onboarding from './Onboarding.svelte'
@@ -45,7 +47,7 @@
         search?.select()
       } else if (name.startsWith('go-')) {
         sheet = null
-        const kind = name.slice(3) as 'mine' | 'team' | 'inbox' | 'calendar' | 'teamStatus' | 'history'
+        const kind = name.slice(3) as 'mine' | 'team' | 'inbox' | 'calendar' | 'teamStatus' | 'history' | 'github' | 'admin'
         go({ kind })
       } else if (name === 'toggle-done') nav.showDone = !nav.showDone
       else if (name === 'onboarding') {
@@ -69,6 +71,8 @@
     if (s.kind === 'calendar') return '캘린더'
     if (s.kind === 'teamStatus') return '팀 현황'
     if (s.kind === 'history') return '자동 정리 기록'
+    if (s.kind === 'github') return '개발 현황'
+    if (s.kind === 'admin') return '팀·연결 설정'
     if (s.kind === 'project') return v.projects?.find((p) => p.id === s.id)?.name ?? '프로젝트'
     return v.members?.find((m) => m.id === s.id)?.name ?? '팀원'
   })
@@ -118,6 +122,8 @@
       case 'calendar': return '팀 회의 일정 · 한국·일본 시간'
       case 'teamStatus': return '누가 얼마나 맡고 있는지 · 이름을 누르면 그 사람 목록'
       case 'history': return '봇이 스스로 연결하거나 진행·완료 처리한 기록 · 틀리면 되돌리세요'
+      case 'github': return '연결된 저장소의 이슈와 PR · 어떤 업무인지 연결해 두면 진행이 자동으로 반영돼요'
+      case 'admin': return '자동화, 프로젝트와 채널, 팀원, GitHub 저장소'
       case 'mine': return `${todayLabel()} · ${summary}`
       default: return summary
     }
@@ -206,6 +212,10 @@
           <TeamStatus />
         {:else if nav.scope.kind === 'history'}
           <History onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'github'}
+          <GitHubView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'admin'}
+          <AdminView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else}
           {#each groups as g (g.title)}
             <h2>{g.title} <span>{g.items.length}</span></h2>

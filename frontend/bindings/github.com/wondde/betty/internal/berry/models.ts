@@ -54,10 +54,75 @@ export interface DesignQuestion {
     "url": string;
 }
 
+export interface DiscordChannel {
+    "id": string;
+    "name": string;
+    "category": string;
+}
+
 export interface Evidence {
     "label": string;
     "quote": string;
     "url": string;
+}
+
+export interface GitHub {
+    "repos": GitHubRepo[] | null;
+    "items": GitHubItem[] | null;
+    "suggestions": GitHubSuggestion[] | null;
+    "identities": GitHubIdentity[] | null;
+}
+
+export interface GitHubIdentity {
+    "login": string;
+    "member_id": string;
+}
+
+export interface GitHubItem {
+    "repo_id": string;
+    "number": number;
+
+    /**
+     * issue | pr
+     */
+    "kind": string;
+
+    /**
+     * open | closed
+     */
+    "state": string;
+
+    /**
+     * open | closed | not_planned | draft | review_requested | merged
+     */
+    "stage": string;
+    "title": string;
+    "state_reason": string;
+    "author": string;
+    "assignees": string[] | null;
+    "reviewers": string[] | null;
+    "updated_at": string;
+    "url": string;
+    "project_id": string;
+    "ticket_ids": string[] | null;
+}
+
+export interface GitHubRepo {
+    "id": string;
+    "full_name": string;
+    "project_id": string;
+    "synced_at": string;
+    "error": string;
+}
+
+/**
+ * GitHubSuggestion: the assistant thinks this task and GitHub item are the same work.
+ */
+export interface GitHubSuggestion {
+    "ticket_id": string;
+    "repo_id": string;
+    "number": number;
+    "reason": string;
 }
 
 /**
@@ -137,12 +202,30 @@ export interface MeetingProposal {
 export interface Member {
     "id": string;
     "name": string;
+    "discord_id"?: string;
+
+    /**
+     * personal work channel
+     */
+    "channel_id"?: string;
+}
+
+export interface MemberInput {
+    "name": string;
+    "discord_id": string;
+    "channel_id": string;
+    "github_login": string;
 }
 
 export interface Project {
     "id": string;
     "name": string;
     "color": string;
+}
+
+export interface ProjectChannel {
+    "channel_id": string;
+    "project_id": string;
 }
 
 /**

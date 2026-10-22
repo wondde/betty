@@ -28,6 +28,10 @@ export interface View {
     "meetingProposals": berry$0.MeetingProposal[] | null;
     "designQuestions": berry$0.DesignQuestion[] | null;
     "meetings": berry$0.Meeting[] | null;
+    "github": berry$0.GitHub;
+    "settings": { [_ in string]?: boolean } | null;
+    "discordChannels": berry$0.DiscordChannel[] | null;
+    "projectChannels": berry$0.ProjectChannel[] | null;
 
     /**
      * my open tasks not looked at yet

@@ -9,14 +9,18 @@ import (
 // Board is the subset of the BerryTicket board (/api/state) the app uses:
 // every task, the review inbox, people and projects.
 type Board struct {
-	User         BoardUser     `json:"user"`
-	Tickets      []BoardTicket `json:"tickets"`
-	Members      []Member      `json:"members"`
-	Projects     []Project     `json:"projects"`
-	Proposals    []Proposal    `json:"proposals"`
-	Calendar     Calendar      `json:"calendar"`
-	DesignReview DesignReview  `json:"design_review"`
-	Revision     string        `json:"revision"`
+	User            BoardUser        `json:"user"`
+	Tickets         []BoardTicket    `json:"tickets"`
+	Members         []Member         `json:"members"`
+	Projects        []Project        `json:"projects"`
+	Proposals       []Proposal       `json:"proposals"`
+	Calendar        Calendar         `json:"calendar"`
+	DesignReview    DesignReview     `json:"design_review"`
+	GitHub          GitHub           `json:"github"`
+	Settings        map[string]bool  `json:"settings"`
+	DiscordChannels []DiscordChannel `json:"discord_channels"`
+	ProjectChannels []ProjectChannel `json:"project_channels"`
+	Revision        string           `json:"revision"`
 }
 
 type BoardUser struct {
@@ -275,4 +279,115 @@ func (c *Client) History(ctx context.Context, cursor, status string) (History, e
 
 func (c *Client) Undo(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodPost, "/api/automation/history/"+url.PathEscape(id)+"/undo", map[string]any{}, true, nil)
+}
+
+// ---------- GitHub (read-only sync on the server) ----------
+
+type GitHub struct {
+	Repos       []GitHubRepo       `json:"repos"`
+	Items       []GitHubItem       `json:"items"`
+	Suggestions []GitHubSuggestion `json:"suggestions"`
+	Identities  []GitHubIdentity   `json:"identities"`
+}
+
+type GitHubRepo struct {
+	ID        string `json:"id"`
+	FullName  string `json:"full_name"`
+	ProjectID string `json:"project_id"`
+	SyncedAt  string `json:"synced_at"`
+	Error     string `json:"error"`
+}
+
+type GitHubItem struct {
+	RepoID      string   `json:"repo_id"`
+	Number      int      `json:"number"`
+	Kind        string   `json:"kind"`  // issue | pr
+	State       string   `json:"state"` // open | closed
+	Stage       string   `json:"stage"` // open | closed | not_planned | draft | review_requested | merged
+	Title       string   `json:"title"`
+	StateReason string   `json:"state_reason"`
+	Author      string   `json:"author"`
+	Assignees   []string `json:"assignees"`
+	Reviewers   []string `json:"reviewers"`
+	UpdatedAt   string   `json:"updated_at"`
+	URL         string   `json:"url"`
+	ProjectID   string   `json:"project_id"`
+	TicketIDs   []string `json:"ticket_ids"`
+}
+
+// GitHubSuggestion: the assistant thinks this task and GitHub item are the same work.
+type GitHubSuggestion struct {
+	TicketID string `json:"ticket_id"`
+	RepoID   string `json:"repo_id"`
+	Number   int    `json:"number"`
+	Reason   string `json:"reason"`
+}
+
+type GitHubIdentity struct {
+	Login    string `json:"login"`
+	MemberID string `json:"member_id"`
+}
+
+type DiscordChannel struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Category string `json:"category"`
+}
+
+type ProjectChannel struct {
+	ChannelID string `json:"channel_id"`
+	ProjectID string `json:"project_id"`
+}
+
+// GitHubLink links (or with remove, unlinks) a task and a GitHub item; versions guard both sides.
+func (c *Client) GitHubLink(ctx context.Context, ticketID, ticketVersion, repoID string, number int, itemVersion string, allowShared, remove bool) error {
+	method := http.MethodPost
+	if remove {
+		method = http.MethodDelete
+	}
+	body := map[string]any{"repo_id": repoID, "number": number, "expected_updated_at": ticketVersion, "expected_github_updated_at": itemVersion, "allow_shared": allowShared}
+	return c.do(ctx, method, "/api/tickets/"+url.PathEscape(ticketID)+"/github-links", body, true, nil)
+}
+
+// GitHubReject records that a suggested pair is not the same work, so it is not suggested again.
+func (c *Client) GitHubReject(ctx context.Context, ticketID, ticketVersion, repoID string, number int) error {
+	body := map[string]any{"repo_id": repoID, "number": number, "expected_updated_at": ticketVersion}
+	return c.do(ctx, http.MethodPost, "/api/tickets/"+url.PathEscape(ticketID)+"/github-links/reject", body, true, nil)
+}
+
+func (c *Client) AddRepo(ctx context.Context, fullName, projectID string) error {
+	return c.do(ctx, http.MethodPost, "/api/github/repos", map[string]any{"full_name": fullName, "project_id": projectID}, true, nil)
+}
+
+func (c *Client) RemoveRepo(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/api/github/repos/"+url.PathEscape(id), map[string]any{}, true, nil)
+}
+
+// ---------- team settings ----------
+
+func (c *Client) SaveProject(ctx context.Context, id, name string, channelIDs []string) error {
+	body := map[string]any{"name": name, "channel_ids": channelIDs}
+	if id == "" {
+		return c.do(ctx, http.MethodPost, "/api/projects", body, true, nil)
+	}
+	return c.do(ctx, http.MethodPatch, "/api/projects/"+url.PathEscape(id), body, true, nil)
+}
+
+type MemberInput struct {
+	Name        string `json:"name"`
+	DiscordID   string `json:"discord_id"`
+	ChannelID   string `json:"channel_id"`
+	GitHubLogin string `json:"github_login"`
+}
+
+func (c *Client) SaveMember(ctx context.Context, id string, in MemberInput) error {
+	if id == "" {
+		return c.do(ctx, http.MethodPost, "/api/members", in, true, nil)
+	}
+	return c.do(ctx, http.MethodPatch, "/api/members/"+url.PathEscape(id), in, true, nil)
+}
+
+// SetSetting flips one automation switch (see the board's /api/settings for the allowed keys).
+func (c *Client) SetSetting(ctx context.Context, key string, on bool) error {
+	return c.do(ctx, http.MethodPost, "/api/settings", map[string]any{key: on}, true, nil)
 }

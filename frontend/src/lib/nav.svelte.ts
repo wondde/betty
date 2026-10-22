@@ -7,6 +7,8 @@ export type Scope =
   | { kind: 'calendar' }
   | { kind: 'teamStatus' }
   | { kind: 'history' }
+  | { kind: 'github' }
+  | { kind: 'admin' }
   | { kind: 'project'; id: string }
   | { kind: 'member'; id: string }
 
@@ -27,4 +29,4 @@ export function sameScope(a: Scope, b: Scope): boolean {
 }
 
 // Views without a task list (no search, no add field, no detail pane).
-export const isTaskList = (s: Scope) => !['inbox', 'calendar', 'teamStatus', 'history'].includes(s.kind)
+export const isTaskList = (s: Scope) => !['inbox', 'calendar', 'teamStatus', 'history', 'github', 'admin'].includes(s.kind)

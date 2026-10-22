@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.4.0"
+const version = "0.5.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -39,6 +39,10 @@ type View struct {
 	MeetingProposals []berry.MeetingProposal `json:"meetingProposals"`
 	DesignQuestions  []berry.DesignQuestion  `json:"designQuestions"`
 	Meetings         []berry.Meeting         `json:"meetings"`
+	GitHub           berry.GitHub            `json:"github"`
+	Settings         map[string]bool         `json:"settings"`
+	DiscordChannels  []berry.DiscordChannel  `json:"discordChannels"`
+	ProjectChannels  []berry.ProjectChannel  `json:"projectChannels"`
 	New              []string                `json:"new"` // my open tasks not looked at yet
 	Order            []string                `json:"order"`
 	HintDone         bool                    `json:"hintDone"`
@@ -95,6 +99,7 @@ func (b *Betty) View() View {
 		v.Tickets, v.Members, v.Projects = s.Tasks(), s.Members, s.Projects
 		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
 		v.Meetings = s.Calendar.Meetings
+		v.GitHub, v.Settings, v.DiscordChannels, v.ProjectChannels = s.GitHub, s.Settings, s.DiscordChannels, s.ProjectChannels
 		seen := toSet(d.Seen)
 		for _, t := range mine(s) {
 			if !seen[t.ID] {
@@ -403,6 +408,57 @@ func (b *Betty) History(cursor, status string) (berry.History, error) {
 // Undo reverts one automatic change and reloads the board.
 func (b *Betty) Undo(id string) error {
 	return b.inbox(func(ctx context.Context) error { return b.client.Undo(ctx, id) })
+}
+
+// ---------- GitHub ----------
+
+// LinkGitHub marks a task and a GitHub issue/PR as the same work (or unlinks with remove).
+func (b *Betty) LinkGitHub(ticketID, repoID string, number int, allowShared, remove bool) error {
+	t, ok := b.boardTicket(ticketID)
+	if !ok {
+		return errors.New("업무를 찾지 못했어요. 새로고침해 주세요")
+	}
+	itemVersion := ""
+	if s := b.prefs.Get().Snapshot; s != nil {
+		for _, i := range s.GitHub.Items {
+			if i.RepoID == repoID && i.Number == number {
+				itemVersion = i.UpdatedAt
+			}
+		}
+	}
+	return b.inbox(func(ctx context.Context) error {
+		return b.client.GitHubLink(ctx, ticketID, t.UpdatedAt, repoID, number, itemVersion, allowShared, remove)
+	})
+}
+
+func (b *Betty) RejectGitHub(ticketID, repoID string, number int) error {
+	t, ok := b.boardTicket(ticketID)
+	if !ok {
+		return errors.New("업무를 찾지 못했어요. 새로고침해 주세요")
+	}
+	return b.inbox(func(ctx context.Context) error { return b.client.GitHubReject(ctx, ticketID, t.UpdatedAt, repoID, number) })
+}
+
+func (b *Betty) AddRepo(fullName, projectID string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.AddRepo(ctx, fullName, projectID) })
+}
+
+func (b *Betty) RemoveRepo(id string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.RemoveRepo(ctx, id) })
+}
+
+// ---------- team settings ----------
+
+func (b *Betty) SaveProject(id, name string, channelIDs []string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.SaveProject(ctx, id, name, channelIDs) })
+}
+
+func (b *Betty) SaveMember(id string, in berry.MemberInput) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.SaveMember(ctx, id, in) })
+}
+
+func (b *Betty) SetSetting(key string, on bool) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.SetSetting(ctx, key, on) })
 }
 
 func (b *Betty) inbox(call func(context.Context) error) error {
