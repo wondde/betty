@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.3.0"
+const version = "0.4.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -38,6 +38,7 @@ type View struct {
 	Proposals        []berry.Proposal        `json:"proposals"`
 	MeetingProposals []berry.MeetingProposal `json:"meetingProposals"`
 	DesignQuestions  []berry.DesignQuestion  `json:"designQuestions"`
+	Meetings         []berry.Meeting         `json:"meetings"`
 	New              []string                `json:"new"` // my open tasks not looked at yet
 	Order            []string                `json:"order"`
 	HintDone         bool                    `json:"hintDone"`
@@ -93,6 +94,7 @@ func (b *Betty) View() View {
 		v.Member = &berry.Member{ID: s.User.ID, Name: s.User.Name}
 		v.Tickets, v.Members, v.Projects = s.Tasks(), s.Members, s.Projects
 		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
+		v.Meetings = s.Calendar.Meetings
 		seen := toSet(d.Seen)
 		for _, t := range mine(s) {
 			if !seen[t.ID] {
@@ -367,6 +369,40 @@ func (b *Betty) DismissMeeting(id string) error {
 
 func (b *Betty) DismissDesignQuestion(id string) error {
 	return b.inbox(func(ctx context.Context) error { return b.client.DismissDesignQuestion(ctx, id) })
+}
+
+// ---------- calendar ----------
+
+// SaveMeeting creates a meeting (id "") or edits one; editing is based on the version last loaded.
+func (b *Betty) SaveMeeting(id string, in berry.MeetingInput) error {
+	if id != "" {
+		if s := b.prefs.Get().Snapshot; s != nil {
+			for _, m := range s.Calendar.Meetings {
+				if m.ID == id {
+					in.ExpectedUpdatedAt = m.UpdatedAt
+				}
+			}
+		}
+	}
+	return b.inbox(func(ctx context.Context) error { return b.client.SaveMeeting(ctx, id, in) })
+}
+
+// ---------- automation history ----------
+
+// History loads a page of the assistant's automatic changes; status is all | active | undone.
+func (b *Betty) History(cursor, status string) (berry.History, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	h, err := b.client.History(ctx, cursor, status)
+	if err != nil {
+		return berry.History{}, b.handle(err)
+	}
+	return h, nil
+}
+
+// Undo reverts one automatic change and reloads the board.
+func (b *Betty) Undo(id string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.Undo(ctx, id) })
 }
 
 func (b *Betty) inbox(call func(context.Context) error) error {

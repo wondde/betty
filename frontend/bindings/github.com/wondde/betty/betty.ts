@@ -95,6 +95,13 @@ export function HideWindow(name: string): $CancellablePromise<void> {
 }
 
 /**
+ * History loads a page of the assistant's automatic changes; status is all | active | undone.
+ */
+export function History(cursor: string, status: string): $CancellablePromise<berry$0.History> {
+    return $Call.ByID(66976068, cursor, status);
+}
+
+/**
  * NotificationsAllowed reports the macOS notification permission without prompting.
  */
 export function NotificationsAllowed(): $CancellablePromise<boolean> {
@@ -117,6 +124,13 @@ export function OpenURL(link: string): $CancellablePromise<void> {
  */
 export function Refresh(): $CancellablePromise<void> {
     return $Call.ByID(1750633071);
+}
+
+/**
+ * SaveMeeting creates a meeting (id "") or edits one; editing is based on the version last loaded.
+ */
+export function SaveMeeting(id: string, $in: berry$0.MeetingInput): $CancellablePromise<void> {
+    return $Call.ByID(563081758, id, $in);
 }
 
 export function SaveOrder(ids: string[] | null): $CancellablePromise<void> {
@@ -153,6 +167,13 @@ export function SignIn(): $CancellablePromise<void> {
  */
 export function SignOut(): $CancellablePromise<void> {
     return $Call.ByID(3861533215);
+}
+
+/**
+ * Undo reverts one automatic change and reloads the board.
+ */
+export function Undo(id: string): $CancellablePromise<void> {
+    return $Call.ByID(639688850, id);
 }
 
 /**

@@ -16,6 +16,15 @@
     { scope: { kind: 'unassigned' } as Scope, icon: '○', label: '담당자 없음', count: open.filter((t) => !t.assignee_id).length },
     { scope: { kind: 'inbox' } as Scope, icon: '✉︎', label: '확인해 주세요', count: inboxCount, badge: true },
   ])
+  const soonMeetings = $derived.by(() => {
+    const today = new Date().toISOString().slice(0, 10), week = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+    return (v.meetings ?? []).filter((m) => m.status !== 'cancelled' && m.date >= today && m.date <= week).length
+  })
+  const views = $derived([
+    { scope: { kind: 'calendar' } as Scope, icon: '▦', label: '캘린더', count: soonMeetings },
+    { scope: { kind: 'teamStatus' } as Scope, icon: '▤', label: '팀 현황', count: 0 },
+    { scope: { kind: 'history' } as Scope, icon: '↺', label: '자동 정리 기록', count: 0 },
+  ])
   const projects = $derived((v.projects ?? []).map((p) => ({ ...p, count: open.filter((t) => t.project?.id === p.id).length })))
   const members = $derived((v.members ?? []).map((m) => ({ ...m, count: open.filter((t) => t.assignee_id === m.id).length })))
 </script>
@@ -27,6 +36,15 @@
         <span class="icon" aria-hidden="true">{item.icon}</span>
         <span class="label">{item.label}</span>
         {#if item.count}<span class="count" class:badge={item.badge}>{item.count}</span>{/if}
+      </button>
+    {/each}
+
+    <h3>보기</h3>
+    {#each views as item}
+      <button class="row" class:active={sameScope(nav.scope, item.scope)} onclick={() => go(item.scope)}>
+        <span class="icon" aria-hidden="true">{item.icon}</span>
+        <span class="label">{item.label}</span>
+        {#if item.count}<span class="count">{item.count}</span>{/if}
       </button>
     {/each}
 

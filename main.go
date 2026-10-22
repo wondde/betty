@@ -46,7 +46,7 @@ func instanceID() string {
 func init() {
 	application.RegisterEvent[View]("betty:view")
 	application.RegisterEvent[string]("betty:quick-open")
-	// about | new-task | search | settings | onboarding | toggle-done | shortcuts
+	// about | new-task | search | settings | onboarding | toggle-done | shortcuts | go-<view>
 	application.RegisterEvent[string]("betty:command")
 }
 
@@ -189,6 +189,18 @@ func main() {
 	editMenu.Add("찾기").SetAccelerator("CmdOrCtrl+F").OnClick(func(*application.Context) { command("search") })
 
 	viewMenu := menu.AddSubmenu("보기")
+	for _, v := range []struct{ label, key, cmd string }{
+		{"내 할 일", "CmdOrCtrl+1", "go-mine"},
+		{"팀 전체", "CmdOrCtrl+2", "go-team"},
+		{"확인해 주세요", "CmdOrCtrl+3", "go-inbox"},
+		{"캘린더", "CmdOrCtrl+4", "go-calendar"},
+		{"팀 현황", "CmdOrCtrl+5", "go-teamStatus"},
+		{"자동 정리 기록", "CmdOrCtrl+6", "go-history"},
+	} {
+		cmd := v.cmd
+		viewMenu.Add(v.label).SetAccelerator(v.key).OnClick(func(*application.Context) { command(cmd) })
+	}
+	viewMenu.AddSeparator()
 	viewMenu.Add("최근 완료 보기/숨기기").SetAccelerator("CmdOrCtrl+Shift+D").OnClick(func(*application.Context) { command("toggle-done") })
 
 	windowMenu := menu.AddSubmenu("윈도우")

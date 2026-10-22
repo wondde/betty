@@ -70,7 +70,83 @@ type Routing struct {
 }
 
 type Calendar struct {
+	Meetings  []Meeting         `json:"meetings"`
 	Proposals []MeetingProposal `json:"proposals"`
+}
+
+// Meeting is a calendar entry (Asia/Tokyo dates and times).
+type Meeting struct {
+	ID           string   `json:"id"`
+	ProjectID    string   `json:"project_id"`
+	Title        string   `json:"title"`
+	Date         string   `json:"date"`       // YYYY-MM-DD
+	StartTime    string   `json:"start_time"` // HH:MM or ""
+	EndTime      string   `json:"end_time"`
+	Participants []string `json:"participants"`
+	Location     string   `json:"location"`
+	Description  string   `json:"description"`
+	SourceURL    string   `json:"source_url"`
+	Status       string   `json:"status"` // scheduled | cancelled
+	UpdatedAt    string   `json:"updated_at"`
+}
+
+// MeetingInput creates or edits a meeting; ExpectedUpdatedAt is required when editing.
+type MeetingInput struct {
+	ProjectID         string   `json:"project_id,omitempty"`
+	Title             string   `json:"title"`
+	Date              string   `json:"date"`
+	StartTime         string   `json:"start_time"`
+	EndTime           string   `json:"end_time"`
+	Participants      []string `json:"participants"`
+	Location          string   `json:"location"`
+	Description       string   `json:"description"`
+	Status            string   `json:"status,omitempty"`
+	ExpectedUpdatedAt string   `json:"expected_updated_at,omitempty"`
+}
+
+// History is one page of what the assistant changed on its own (linked, progressed, completed).
+type History struct {
+	Items      []Change `json:"items"`
+	Total      int      `json:"total"`
+	NextCursor *string  `json:"next_cursor"`
+}
+
+type Change struct {
+	ID          string       `json:"id"`
+	Source      string       `json:"source"`
+	TicketID    *string      `json:"ticket_id"`
+	Kind        string       `json:"kind"` // linked | progressed | completed
+	CreatedAt   string       `json:"created_at"`
+	UndoneAt    string       `json:"undone_at"`
+	UndoneBy    string       `json:"undone_by"`
+	Ticket      ChangeTicket `json:"ticket"`
+	Reason      string       `json:"reason"`
+	Evidence    []Evidence   `json:"evidence"`
+	BeforeState *string      `json:"before_status"`
+	AfterState  *string      `json:"after_status"`
+	Links       []ChangeLink `json:"links"`
+	CanUndo     bool         `json:"can_undo"`
+	UndoReason  string       `json:"undo_reason"`
+}
+
+type ChangeTicket struct {
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	ProjectID string `json:"project_id"`
+}
+
+type Evidence struct {
+	Label string `json:"label"`
+	Quote string `json:"quote"`
+	URL   string `json:"url"`
+}
+
+type ChangeLink struct {
+	Kind       string `json:"kind"`
+	Label      string `json:"label"`
+	Number     int    `json:"number"`
+	Repository string `json:"repository"`
+	URL        string `json:"url"`
 }
 
 type MeetingProposal struct {
@@ -174,4 +250,29 @@ func (t BoardTicket) Ticket(p *Project) Ticket {
 	return Ticket{ID: t.ID, Number: t.Number, Title: t.Title, Description: t.Description, Status: t.Status,
 		Priority: t.Priority, DueDate: t.DueDate, SourceURL: t.SourceURL, UpdatedAt: t.UpdatedAt, Project: p,
 		AssigneeID: t.AssigneeID, Area: t.Area, CreatedAt: t.CreatedAt}
+}
+
+func (c *Client) SaveMeeting(ctx context.Context, id string, in MeetingInput) error {
+	if id == "" {
+		return c.do(ctx, http.MethodPost, "/api/meetings", in, true, nil)
+	}
+	return c.do(ctx, http.MethodPatch, "/api/meetings/"+url.PathEscape(id), in, true, nil)
+}
+
+// History lists automatic changes, newest first; cursor continues from the previous page.
+func (c *Client) History(ctx context.Context, cursor, status string) (History, error) {
+	q := url.Values{"limit": {"30"}}
+	if cursor != "" {
+		q.Set("cursor", cursor)
+	}
+	if status != "" {
+		q.Set("status", status)
+	}
+	var h History
+	err := c.do(ctx, http.MethodGet, "/api/automation/history?"+q.Encode(), nil, true, &h)
+	return h, err
+}
+
+func (c *Client) Undo(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodPost, "/api/automation/history/"+url.PathEscape(id)+"/undo", map[string]any{}, true, nil)
 }

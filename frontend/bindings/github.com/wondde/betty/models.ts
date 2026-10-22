@@ -27,6 +27,7 @@ export interface View {
     "proposals": berry$0.Proposal[] | null;
     "meetingProposals": berry$0.MeetingProposal[] | null;
     "designQuestions": berry$0.DesignQuestion[] | null;
+    "meetings": berry$0.Meeting[] | null;
 
     /**
      * my open tasks not looked at yet

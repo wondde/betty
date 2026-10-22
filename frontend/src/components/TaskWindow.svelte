@@ -9,12 +9,15 @@
   import { BettyCommand } from '../../bindings/events'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
-  import { nav } from '../lib/nav.svelte'
+  import { nav, go, isTaskList } from '../lib/nav.svelte'
   import { daysUntil, groupByStatus, matches, sortTasks, todayLabel } from '../lib/tasks'
   import Sidebar from './Sidebar.svelte'
   import TaskCard from './TaskCard.svelte'
   import TaskDetail from './TaskDetail.svelte'
   import Inbox from './Inbox.svelte'
+  import Calendar from './Calendar.svelte'
+  import History from './History.svelte'
+  import TeamStatus from './TeamStatus.svelte'
   import Composer from './Composer.svelte'
   import SignIn from './SignIn.svelte'
   import Onboarding from './Onboarding.svelte'
@@ -34,12 +37,16 @@
       const name = e.data as string
       if (name === 'new-task') {
         sheet = null
-        if (nav.scope.kind === 'inbox') nav.scope = { kind: 'mine' }
+        if (!isTaskList(nav.scope)) go({ kind: 'mine' })
         queueMicrotask(() => composer?.focus())
       } else if (name === 'search') {
         sheet = null
         search?.focus()
         search?.select()
+      } else if (name.startsWith('go-')) {
+        sheet = null
+        const kind = name.slice(3) as 'mine' | 'team' | 'inbox' | 'calendar' | 'teamStatus' | 'history'
+        go({ kind })
       } else if (name === 'toggle-done') nav.showDone = !nav.showDone
       else if (name === 'onboarding') {
         sheet = null
@@ -59,6 +66,9 @@
     if (s.kind === 'team') return '팀 전체'
     if (s.kind === 'unassigned') return '담당자 없음'
     if (s.kind === 'inbox') return '확인해 주세요'
+    if (s.kind === 'calendar') return '캘린더'
+    if (s.kind === 'teamStatus') return '팀 현황'
+    if (s.kind === 'history') return '자동 정리 기록'
     if (s.kind === 'project') return v.projects?.find((p) => p.id === s.id)?.name ?? '프로젝트'
     return v.members?.find((m) => m.id === s.id)?.name ?? '팀원'
   })
@@ -101,6 +111,16 @@
     const urgent = open.filter((t) => (daysUntil(t.due_date) ?? 99) <= 1).length
     const working = open.filter((t) => t.status === 'in_progress').length
     return [`남은 일 ${open.length}`, working && `진행 중 ${working}`, urgent && `마감 임박 ${urgent}`].filter(Boolean).join(' · ')
+  })
+  const subtitle = $derived.by(() => {
+    switch (nav.scope.kind) {
+      case 'inbox': return '대화에서 찾은 일이에요. 맞으면 넣어 주세요.'
+      case 'calendar': return '팀 회의 일정 · 한국·일본 시간'
+      case 'teamStatus': return '누가 얼마나 맡고 있는지 · 이름을 누르면 그 사람 목록'
+      case 'history': return '봇이 스스로 연결하거나 진행·완료 처리한 기록 · 틀리면 되돌리세요'
+      case 'mine': return `${todayLabel()} · ${summary}`
+      default: return summary
+    }
   })
   const synced = $derived(v.syncedAt ? new Date(v.syncedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '')
 
@@ -160,10 +180,10 @@
       <header>
         <div class="heading">
           <h1>{scopeTitle}</h1>
-          <p class="sub">{nav.scope.kind === 'mine' ? todayLabel() + ' · ' : ''}{nav.scope.kind === 'inbox' ? '대화에서 찾은 일이에요. 맞으면 넣어 주세요.' : summary}</p>
+          <p class="sub">{subtitle}</p>
         </div>
         <div class="tools">
-          {#if nav.scope.kind !== 'inbox'}
+          {#if isTaskList(nav.scope)}
             <label class="search">
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
               <input bind:this={search} bind:value={nav.query} placeholder="검색 (⌘F)" aria-label="업무 검색" spellcheck="false" />
@@ -180,6 +200,12 @@
       <section class="list">
         {#if nav.scope.kind === 'inbox'}
           <Inbox onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'calendar'}
+          <Calendar onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'teamStatus'}
+          <TeamStatus />
+        {:else if nav.scope.kind === 'history'}
+          <History onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else}
           {#each groups as g (g.title)}
             <h2>{g.title} <span>{g.items.length}</span></h2>
@@ -203,7 +229,7 @@
         {/if}
       </section>
 
-      {#if nav.scope.kind !== 'inbox'}
+      {#if isTaskList(nav.scope)}
         <footer>
           {#if toast}<p class="toast" class:ok={toast.ok}>{toast.text}</p>{/if}
           <Composer bind:this={composer} onresult={(text, ok) => say(text, ok)} />
@@ -213,7 +239,7 @@
       {/if}
     </main>
 
-    {#if selected}
+    {#if selected && isTaskList(nav.scope)}
       <TaskDetail ticket={selected} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
     {/if}
   </div>
