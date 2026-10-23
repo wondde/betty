@@ -118,3 +118,8 @@ export function stageLabel(i: GitHubItem): [string, string] {
   if (i.kind === 'issue' && i.state === 'closed') return i.state_reason === 'completed' ? ['완료됨', 'merged'] : ['하지 않기로 함', 'closed']
   return ({ draft: ['준비 중', 'draft'], review_requested: ['리뷰 요청', 'review'] } as Record<string, [string, string]>)[i.stage] ?? ['진행 중', 'open']
 }
+
+// 정리하기 candidates: open work nobody owns, or that hasn't moved for a week.
+export function needsCleanup(t: Ticket, now = Date.now()): boolean {
+  return t.status !== 'done' && (!t.assignee_id || now - Date.parse(t.updated_at) > 7 * 86400000)
+}

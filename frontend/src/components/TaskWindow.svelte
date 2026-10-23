@@ -12,7 +12,7 @@
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
   import { nav, go, isTaskList, byProject, areaName, memberArea } from '../lib/nav.svelte'
-  import { daysUntil, groupByProject, groupByStatus, matches, sortTasks, statusLabel, todayLabel, type Group } from '../lib/tasks'
+  import { daysUntil, groupByProject, groupByStatus, matches, needsCleanup, sortTasks, statusLabel, todayLabel, type Group } from '../lib/tasks'
   import ProjectChips from './ProjectChips.svelte'
   import Sidebar from './Sidebar.svelte'
   import TaskCard from './TaskCard.svelte'
@@ -26,6 +26,8 @@
   import Board from './Board.svelte'
   import CaptureSheet from './CaptureSheet.svelte'
   import SettingsView from './SettingsView.svelte'
+  import CleanupView from './CleanupView.svelte'
+  import NowDoing from './NowDoing.svelte'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
   let refreshing = $state(false)
@@ -37,6 +39,7 @@
   let settings = $state<string | null>(null) // open tab, or null when closed
   const openSettings = (tab = 'general') => ((sheet = null), (settings = tab))
   let capturing = $state(false)
+  let cleaning = $state(false)
 
   // App menu commands (파일 · 편집 · 보기 · 도움말 …) arrive from Go as "betty:command".
   onMount(() =>
@@ -89,6 +92,7 @@
   const areaMembers = $derived(new Set(nav.scope.kind === 'area' ? (v.members ?? []).filter((m) => memberArea(m) === (nav.scope as { id: string }).id).map((m) => m.id) : []))
   const boardMode = $derived(nav.scope.kind === 'team' && nav.board)
   const unassignedCount = $derived(all.filter((t) => t.status !== 'done' && !t.assignee_id).length)
+  const cleanupCount = $derived(all.filter((t) => needsCleanup(t) && (!nav.project || t.project?.id === nav.project)).length)
 
   // The scope before the project chip narrows it (the chips count from this).
   const scoped = $derived.by(() => {
@@ -213,13 +217,13 @@
       return
     }
     // ⌘⌫ moves the selected task to the trash (only outside text fields).
-    if (!typing && !sheet && !capturing && e.metaKey && e.key === 'Backspace' && selected && isTaskList(nav.scope)) {
+    if (!typing && !sheet && !capturing && !cleaning && !settings && e.metaKey && e.key === 'Backspace' && selected && isTaskList(nav.scope)) {
       e.preventDefault()
       const t = selected
       trash(t)
       return
     }
-    if (typing || sheet || capturing || asking.current || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
+    if (typing || sheet || capturing || cleaning || settings || asking.current || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
     e.preventDefault()
     const i = flat.findIndex((t) => t.id === nav.selected)
     const next = e.key === 'ArrowDown' ? Math.min(flat.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1)
@@ -251,6 +255,9 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
               <input bind:this={search} bind:value={nav.query} placeholder="검색 (⌘F)" aria-label="업무 검색" spellcheck="false" />
             </label>
+            {#if nav.scope.kind === 'team' && cleanupCount}
+              <button class="tidy" onclick={() => (cleaning = true)} title="아무도 안 맡았거나 일주일 넘게 그대로인 일을 하나씩 정리해요">정리하기 <span>{cleanupCount}</span></button>
+            {/if}
             {#if nav.scope.kind === 'team'}
               <div class="seg" role="radiogroup" aria-label="보기">
                 <button role="radio" aria-checked={!nav.board} class:on={!nav.board} onclick={() => (nav.board = false)}>목록</button>
@@ -283,6 +290,7 @@
         {:else if boardMode}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
+          {#if (nav.scope.kind === 'team' && !nav.unassigned) || nav.scope.kind === 'area'}<NowDoing tickets={inScope} onselect={select} />{/if}
           {#each groups as g (g.key)}
             <h2 class:section={g.color} style:--pc={g.color}>
               <button onclick={() => toggleGroup(g.key)} aria-expanded={!collapsed.has(g.key)}>
@@ -328,6 +336,7 @@
   </div>
   <AskDialog />
   {#if capturing}<CaptureSheet onclose={() => (capturing = false)} onsent={(m) => say(m, true)} />{/if}
+  {#if cleaning}<CleanupView project={nav.project} onclose={() => (cleaning = false)} onsaved={(m) => say(m, true)} onerror={(m) => say(m)} />{/if}
   {#if settings}<SettingsView tab={settings} onclose={() => (settings = null)} ontour={() => ((settings = null), (tour = true))} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />{/if}
   {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
 {/if}
@@ -374,6 +383,8 @@
   .inbox-tools button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 9px; border: 1px dashed var(--line); color: var(--fg2); font-size: 12.5px; font-weight: 600; }
   .inbox-tools button:hover { background: var(--fill); color: var(--fg); }
   .inbox-tools span { font-weight: 500; color: var(--fg3); font-size: 11px; }
+  .tidy { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); }
+  .tidy span { font-weight: 500; opacity: 0.85; }
   .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }
   .seg button { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--fg2); }
   .seg button.on { background: var(--card-solid, #fff); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
