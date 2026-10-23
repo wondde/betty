@@ -9,8 +9,9 @@
   import { BettyCommand } from '../../bindings/events'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
-  import { nav, go, isTaskList } from '../lib/nav.svelte'
-  import { daysUntil, groupByStatus, matches, sortTasks, todayLabel } from '../lib/tasks'
+  import { nav, go, isTaskList, byProject } from '../lib/nav.svelte'
+  import { daysUntil, groupByProject, groupByStatus, matches, sortTasks, statusLabel, todayLabel, type Group } from '../lib/tasks'
+  import ProjectChips from './ProjectChips.svelte'
   import Sidebar from './Sidebar.svelte'
   import TaskCard from './TaskCard.svelte'
   import TaskDetail from './TaskDetail.svelte'
@@ -84,7 +85,8 @@
     return v.members?.find((m) => m.id === s.id)?.name ?? '팀원'
   })
 
-  const inScope = $derived.by(() => {
+  // The scope before the project chip narrows it (the chips count from this).
+  const scoped = $derived.by(() => {
     const s = nav.scope
     return all.filter((t) => {
       if (s.kind === 'mine') return t.assignee_id === me
@@ -94,29 +96,44 @@
       return true
     })
   })
+  const inScope = $derived(byProject(nav.scope) && nav.project ? scoped.filter((t) => t.project?.id === nav.project) : scoped)
+  // Team-wide lists without a chosen project are sectioned by project.
+  const projectSections = $derived(byProject(nav.scope) && !nav.project && nav.scope.kind !== 'board')
+  let collapsed = $state(new Set<string>())
+  const toggleGroup = (key: string) => (collapsed = collapsed.has(key) ? new Set([...collapsed].filter((k) => k !== key)) : new Set([...collapsed, key]))
   const searching = $derived(nav.query.trim().length > 0)
   const visible = $derived(
     inScope.filter((t) => (nav.showDone || searching || t.status !== 'done') && matches(t, nav.query, v.members ?? [])),
   )
 
   // My list keeps the urgency order; other lists group by status.
-  const groups = $derived.by(() => {
-    if (nav.scope.kind !== 'mine') return groupByStatus(visible)
+  const groups = $derived.by((): Group[] => {
+    if (projectSections) return groupByProject(visible, v.projects ?? [])
+    if (nav.scope.kind !== 'mine') return groupByStatus(visible).map((g) => ({ ...g, key: g.title }))
     const open = sortTasks(visible.filter((t) => t.status !== 'done'), isNew, v.order ?? [])
-    const out: { title: string; items: Ticket[] }[] = []
+    const out: Group[] = []
     for (const t of open) {
       const days = daysUntil(t.due_date)
       const title = days !== null && days <= 1 ? '마감 임박' : isNew.has(t.id) ? '새로 들어온 일' : t.status === 'in_progress' ? '진행 중' : t.status === 'blocked' ? '막힘' : '할 일'
-      if (out.at(-1)?.title !== title) out.push({ title, items: [] })
+      if (out.at(-1)?.title !== title) out.push({ key: title, title, items: [] })
       out.at(-1)!.items.push(t)
     }
     const done = visible.filter((t) => t.status === 'done').sort((a, b) => b.updated_at.localeCompare(a.updated_at))
-    if (done.length) out.push({ title: '완료', items: done })
+    if (done.length) out.push({ key: '완료', title: '완료', items: done })
     return out
   })
-  const flat = $derived(groups.flatMap((g) => g.items))
+  const flat = $derived(groups.filter((g) => !collapsed.has(g.key)).flatMap((g) => g.items))
+  const showProjectChip = $derived(nav.scope.kind !== 'project' && !nav.project && !projectSections)
   // The board shows every status itself (done is limited to recent work inside the board).
-  const boardTickets = $derived(all.filter((t) => matches(t, nav.query, v.members ?? [])))
+  const boardTickets = $derived(inScope.filter((t) => matches(t, nav.query, v.members ?? [])))
+  // The board is per project: arriving without one picks the busiest.
+  $effect(() => {
+    if (nav.scope.kind !== 'board' || nav.project) return
+    const n = new Map<string, number>()
+    for (const t of scoped) if (t.status !== 'done' && t.project) n.set(t.project.id, (n.get(t.project.id) ?? 0) + 1)
+    const busiest = [...n.entries()].sort((a, b) => b[1] - a[1])[0]
+    if (busiest) nav.project = busiest[0]
+  })
   const selected = $derived(all.find((t) => t.id === nav.selected) ?? null)
 
   const summary = $derived.by(() => {
@@ -212,6 +229,7 @@
           </button>
         </div>
       </header>
+      {#if byProject(nav.scope)}<ProjectChips tickets={scoped} all={nav.scope.kind !== 'board'} />{/if}
       {#if v.offline}<p class="offline">오프라인 · 마지막으로 불러온 내용이에요</p>{/if}
 
       <section class="list">
@@ -231,13 +249,20 @@
         {:else if nav.scope.kind === 'board'}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
-          {#each groups as g (g.title)}
-            <h2>{g.title} <span>{g.items.length}</span></h2>
-            {#each g.items as t (t.id)}
-              <div data-task={t.id}>
-                <TaskCard ticket={t} isNew={isNew.has(t.id)} selected={nav.selected === t.id} showAssignee={nav.scope.kind !== 'mine' && nav.scope.kind !== 'member'} onselect={() => select(t)} onerror={(m) => say(m)} />
-              </div>
-            {/each}
+          {#each groups as g (g.key)}
+            <h2 class:section={g.color} style:--pc={g.color}>
+              <button onclick={() => toggleGroup(g.key)} aria-expanded={!collapsed.has(g.key)}>
+                <span class="chev" class:shut={collapsed.has(g.key)} aria-hidden="true">›</span>{#if g.color}<i aria-hidden="true"></i>{/if}{g.title} <span class="n">{g.items.length}</span>
+              </button>
+            </h2>
+            {#if !collapsed.has(g.key)}
+              {#each g.items as t (t.id)}
+                <div data-task={t.id}>
+                  <TaskCard ticket={t} isNew={isNew.has(t.id)} selected={nav.selected === t.id} showAssignee={nav.scope.kind !== 'mine' && nav.scope.kind !== 'member'}
+                    showProject={showProjectChip} showStatus={g.title !== statusLabel[t.status]} onselect={() => select(t)} onerror={(m) => say(m)} />
+                </div>
+              {/each}
+            {/if}
           {:else}
             <div class="empty">
               {#if searching}
@@ -294,8 +319,14 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .offline { margin: 0 18px 6px; padding: 5px 10px; border-radius: 8px; background: var(--fill); font-size: 11px; color: var(--fg2); }
   .list { flex: 1; overflow-y: auto; padding: 0 10px 10px; }
-  h2 { margin: 14px 10px 4px; font-size: 11px; font-weight: 700; color: var(--fg3); }
-  h2 span { font-weight: 500; margin-left: 2px; }
+  h2 { margin: 12px 4px 2px; font-size: 11px; font-weight: 700; color: var(--fg3); }
+  h2 button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; font: inherit; color: inherit; }
+  h2 button:hover { background: var(--fill); }
+  h2 .n { font-weight: 500; }
+  h2.section { position: sticky; top: 0; z-index: 2; margin: 0 -10px; padding: 8px 14px 4px; background: var(--sticky); backdrop-filter: blur(12px); font-size: 12.5px; color: var(--fg); }
+  h2.section i { width: 9px; height: 9px; border-radius: 50%; background: var(--pc); }
+  .chev { display: inline-block; width: 8px; transition: transform 0.12s ease; transform: rotate(90deg); color: var(--fg3); }
+  .chev.shut { transform: rotate(0deg); }
   .empty { text-align: center; padding: 70px 20px; color: var(--fg3); line-height: 1.6; }
   .empty p { margin: 4px 0; }
   .empty b { color: var(--fg); font-size: 14px; }

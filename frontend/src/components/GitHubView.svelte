@@ -35,6 +35,18 @@
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   })
   const suggestions = $derived((gh.suggestions ?? []).filter((s) => ticket(s.ticket_id) && gh.items?.some((i) => key(i) === key(s))))
+  // One card per task: the assistant often proposes several PRs for the same task with the same reason.
+  const byTask = $derived.by(() => {
+    const m = new Map<string, typeof suggestions>()
+    for (const s of suggestions) m.has(s.ticket_id) ? m.get(s.ticket_id)!.push(s) : m.set(s.ticket_id, [s])
+    return [...m.entries()].map(([id, list]) => ({ t: ticket(id)!, list, reasons: [...new Set(list.map((s) => s.reason).filter(Boolean))] }))
+  })
+  let reasonOpen = $state<Record<string, boolean>>({})
+  async function linkAll(list: typeof suggestions) {
+    await run(async () => {
+      for (const s of list) await Betty.LinkGitHub(s.ticket_id, s.repo_id, s.number, false, false)
+    }, list.length > 1 ? `${list.length}개를 한 업무로 연결했어요` : '한 업무로 연결했어요')
+  }
   const candidates = $derived.by(() => {
     const item = gh.items?.find((i) => key(i) === linking)
     return (v.tickets ?? []).filter((t) => t.status !== 'done' && (!item || t.project?.id === item.project_id)).sort((a, b) => b.number - a.number)
@@ -61,19 +73,28 @@
   {#if suggestions.length}
     <section class="suggest">
       <h3>같은 업무인지 확인해 주세요 <span>{suggestions.length}</span></h3>
-      {#each suggestions.slice(0, 20) as s (s.ticket_id + key(s))}
-        {@const t = ticket(s.ticket_id)!}
-        {@const i = gh.items!.find((x) => key(x) === key(s))!}
+      {#each byTask.slice(0, 20) as g (g.t.id)}
         <article class="pair">
-          <div class="sides">
-            <div><small>할 일</small><b>BT-{t.number} {t.title}</b></div>
-            <div><small>{i.kind === 'pr' ? 'PR' : '이슈'} · {repoName(i.repo_id)}</small><b>#{i.number} {i.title}</b></div>
-          </div>
-          {#if s.reason}<p class="reason">{s.reason}</p>{/if}
+          <div class="task"><small>할 일</small><button class="tlink" onclick={() => openTicket(g.t.id)}>BT-{g.t.number} {g.t.title}</button></div>
+          <ul class="items">
+            {#each g.list as s (key(s))}
+              {@const i = gh.items!.find((x) => key(x) === key(s))!}
+              <li>
+                <button class="ilink" onclick={() => Betty.OpenURL(i.url)} title="GitHub에서 보기"><small>{i.kind === 'pr' ? 'PR' : '이슈'} #{i.number}</small> {i.title}</button>
+                <span class="row-actions">
+                  {#if g.list.length > 1}<button disabled={busy} onclick={() => run(() => Betty.LinkGitHub(s.ticket_id, s.repo_id, s.number, false, false), '한 업무로 연결했어요')} title="이것만 연결">✓</button>{/if}
+                  <button disabled={busy} onclick={() => run(() => Betty.RejectGitHub(s.ticket_id, s.repo_id, s.number), '다른 업무로 기억할게요')} title="다른 업무예요">✕</button>
+                </span>
+              </li>
+            {/each}
+          </ul>
+          {#if g.reasons.length}
+            <button class="why" onclick={() => (reasonOpen[g.t.id] = !reasonOpen[g.t.id])}>{reasonOpen[g.t.id] ? '이유 접기' : '왜 같은 업무 같나요?'}</button>
+            {#if reasonOpen[g.t.id]}{#each g.reasons as r}<p class="reason">{r}</p>{/each}{/if}
+          {/if}
           <div class="actions">
-            <button class="primary" disabled={busy} onclick={() => run(() => Betty.LinkGitHub(s.ticket_id, s.repo_id, s.number, false, false), '한 업무로 연결했어요')}>같은 업무예요</button>
-            <button disabled={busy} onclick={() => run(() => Betty.RejectGitHub(s.ticket_id, s.repo_id, s.number), '다른 업무로 기억할게요')}>다른 업무예요</button>
-            <button class="link" onclick={() => Betty.OpenURL(i.url)}>GitHub ↗</button>
+            <button class="primary" disabled={busy} onclick={() => linkAll(g.list)}>{g.list.length > 1 ? `모두 같은 업무예요 (${g.list.length})` : '같은 업무예요'}</button>
+            {#if g.list.length === 1}<button disabled={busy} onclick={() => run(() => Betty.RejectGitHub(g.list[0].ticket_id, g.list[0].repo_id, g.list[0].number), '다른 업무로 기억할게요')}>다른 업무예요</button>{/if}
           </div>
         </article>
       {/each}
@@ -149,10 +170,17 @@
   .suggest h3 { margin: 0 0 6px; font-size: 12.5px; }
   .suggest h3 span { padding: 0 6px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 11px; }
   .pair { padding: 8px 0; border-top: 0.5px solid var(--line); }
-  .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .sides div { display: flex; flex-direction: column; min-width: 0; }
-  .sides small { font-size: 10.5px; color: var(--fg3); }
-  .sides b { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task small, .items small { color: var(--fg3); font-size: 11px; font-weight: 600; margin-right: 4px; }
+  .tlink { font-weight: 700; font-size: 13px; text-align: left; }
+  .tlink:hover { color: var(--accent); }
+  .items { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .items li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 7px; background: var(--fill); }
+  .ilink { flex: 1; min-width: 0; text-align: left; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ilink:hover { color: var(--accent); }
+  .row-actions { display: flex; gap: 2px; flex: none; }
+  .row-actions button { width: 22px; height: 22px; border-radius: 6px; color: var(--fg3); }
+  .row-actions button:hover { background: var(--fill-hover); color: var(--fg); }
+  .why { margin-top: 4px; font-size: 11.5px; color: var(--fg3); }
   .reason { margin: 4px 0; font-size: 12px; color: var(--fg2); }
   .actions, .links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
   .actions button, .mini, .add { height: 24px; padding: 0 10px; border-radius: 6px; background: var(--fill); font-size: 11.5px; font-weight: 600; }

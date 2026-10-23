@@ -11,7 +11,6 @@
   let { tickets, onselect, onerror }: { tickets: Ticket[]; onselect: (t: Ticket) => void; onerror: (m: string) => void } = $props()
 
   let who = $state<'all' | 'mine' | 'unassigned'>('all')
-  let project = $state('')
   // Pointer-driven drag (HTML5 drag-and-drop is unreliable in the macOS webview).
   let dragging = $state<string | null>(null)
   let over = $state<string | null>(null)
@@ -33,7 +32,6 @@
     tickets.filter(
       (t) =>
         (who === 'all' || (who === 'mine' ? t.assignee_id === me : !t.assignee_id)) &&
-        (!project || t.project?.id === project) &&
         (t.status !== 'done' || nav.showDone || t.updated_at >= recent),
     ),
   )
@@ -99,10 +97,6 @@
       <button role="radio" aria-checked={who === value} class:on={who === value} onclick={() => (who = value as typeof who)}>{label}</button>
     {/each}
   </div>
-  <select bind:value={project} aria-label="프로젝트">
-    <option value="">모든 프로젝트</option>
-    {#each app.view.projects ?? [] as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
-  </select>
 </div>
 
 <div class="board" class:lifting={dragging}>
@@ -151,7 +145,6 @@
   .chips button { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--fg2); }
   .chips button.on { background: var(--card-solid, #fff); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
   @media (prefers-color-scheme: dark) { .chips button.on { --card-solid: #48484a; } }
-  select { height: 28px; padding: 0 8px; border: none; outline: none; border-radius: 7px; background: var(--fill); font: inherit; font-size: 12px; color: inherit; }
   .board { display: grid; grid-template-columns: repeat(4, minmax(190px, 1fr)); gap: 8px; min-height: calc(100% - 44px); overflow-x: auto; padding: 0 2px 4px; }
   .column { display: flex; flex-direction: column; min-width: 0; border-radius: 10px; background: var(--fill); transition: box-shadow 0.12s ease; }
   .column.over { box-shadow: inset 0 0 0 2px var(--accent); }

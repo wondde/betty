@@ -16,6 +16,7 @@
   --orange: #ff9500;
   --green: #34c759;
   --discord: #5865f2;
+  --sticky: rgba(246, 246, 248, 0.88); /* section headers that scroll over the glass */
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -30,6 +31,7 @@
     --red: #ff453a;
     --orange: #ff9f0a;
     --green: #30d158;
+    --sticky: rgba(32, 32, 34, 0.88);
   }
 }
 * { box-sizing: border-box; }

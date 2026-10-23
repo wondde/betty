@@ -30,6 +30,20 @@
   ])
   const projects = $derived((v.projects ?? []).map((p) => ({ ...p, count: open.filter((t) => t.project?.id === p.id).length })))
   const members = $derived((v.members ?? []).map((m) => ({ ...m, count: open.filter((t) => t.assignee_id === m.id).length })))
+
+  // Sections fold (remembered), and projects/people with no open work wait under "그 외".
+  const saved = (key: string) => localStorage.getItem('sidebar:' + key) === '1'
+  let folded = $state({ projects: saved('projects'), members: saved('members') })
+  let showIdle = $state({ projects: false, members: false })
+  function fold(key: 'projects' | 'members') {
+    folded[key] = !folded[key]
+    localStorage.setItem('sidebar:' + key, folded[key] ? '1' : '0')
+  }
+  const isHere = (kind: 'project' | 'member', id: string) => nav.scope.kind === kind && nav.scope.id === id
+  const activeProjects = $derived(projects.filter((p) => p.count || isHere('project', p.id)))
+  const idleProjects = $derived(projects.filter((p) => !p.count && !isHere('project', p.id)))
+  const activeMembers = $derived(members.filter((m) => m.count || m.id === me || isHere('member', m.id)))
+  const idleMembers = $derived(members.filter((m) => !m.count && m.id !== me && !isHere('member', m.id)))
 </script>
 
 <aside class="sidebar">
@@ -51,23 +65,29 @@
       </button>
     {/each}
 
-    <h3>프로젝트</h3>
-    {#each projects as p (p.id)}
-      <button class="row" class:active={sameScope(nav.scope, { kind: 'project', id: p.id })} onclick={() => go({ kind: 'project', id: p.id })}>
-        <i class="dot" style:background={p.color} aria-hidden="true"></i>
-        <span class="label">{p.name}</span>
-        {#if p.count}<span class="count">{p.count}</span>{/if}
-      </button>
-    {/each}
+    <h3><button onclick={() => fold('projects')} aria-expanded={!folded.projects}>프로젝트 <span class="chev" class:shut={folded.projects}>›</span></button></h3>
+    {#if !folded.projects}
+      {#each [...activeProjects, ...(showIdle.projects ? idleProjects : [])] as p (p.id)}
+        <button class="row" class:active={sameScope(nav.scope, { kind: 'project', id: p.id })} onclick={() => go({ kind: 'project', id: p.id })}>
+          <i class="dot" style:background={p.color} aria-hidden="true"></i>
+          <span class="label">{p.name}</span>
+          {#if p.count}<span class="count">{p.count}</span>{/if}
+        </button>
+      {/each}
+      {#if idleProjects.length}<button class="more" onclick={() => (showIdle.projects = !showIdle.projects)}>{showIdle.projects ? '접기' : `할 일 없는 프로젝트 ${idleProjects.length}개`}</button>{/if}
+    {/if}
 
-    <h3>팀원</h3>
-    {#each members as m (m.id)}
-      <button class="row" class:active={sameScope(nav.scope, { kind: 'member', id: m.id })} onclick={() => go({ kind: 'member', id: m.id })}>
-        <span class="avatar" aria-hidden="true">{Array.from(m.name)[0]}</span>
-        <span class="label">{m.name}{m.id === me ? ' (나)' : ''}</span>
-        {#if m.count}<span class="count">{m.count}</span>{/if}
-      </button>
-    {/each}
+    <h3><button onclick={() => fold('members')} aria-expanded={!folded.members}>팀원 <span class="chev" class:shut={folded.members}>›</span></button></h3>
+    {#if !folded.members}
+      {#each [...activeMembers, ...(showIdle.members ? idleMembers : [])] as m (m.id)}
+        <button class="row" class:active={sameScope(nav.scope, { kind: 'member', id: m.id })} onclick={() => go({ kind: 'member', id: m.id })}>
+          <span class="avatar" aria-hidden="true">{Array.from(m.name)[0]}</span>
+          <span class="label">{m.name}{m.id === me ? ' (나)' : ''}</span>
+          {#if m.count}<span class="count">{m.count}</span>{/if}
+        </button>
+      {/each}
+      {#if idleMembers.length}<button class="more" onclick={() => (showIdle.members = !showIdle.members)}>{showIdle.members ? '접기' : `할 일 없는 팀원 ${idleMembers.length}명`}</button>{/if}
+    {/if}
   </nav>
 
   <footer>
@@ -82,6 +102,13 @@
   .sidebar { width: 210px; flex: none; display: flex; flex-direction: column; padding: 46px 8px 8px; border-right: 0.5px solid var(--line); background: var(--sidebar, transparent); }
   nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
   h3 { margin: 14px 10px 4px; font-size: 11px; font-weight: 700; color: var(--fg3); }
+  h3 button { display: flex; align-items: center; gap: 4px; width: 100%; font: inherit; color: inherit; }
+  h3 button:hover { color: var(--fg2); }
+  .chev { display: inline-block; transform: rotate(90deg); transition: transform 0.12s ease; opacity: 0; }
+  h3:hover .chev, .chev.shut { opacity: 1; }
+  .chev.shut { transform: rotate(0deg); }
+  .more { height: 24px; padding: 0 10px 0 33px; text-align: left; font-size: 11.5px; color: var(--fg3); border-radius: 7px; }
+  .more:hover { background: var(--fill); color: var(--fg2); }
   .row { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 7px; text-align: left; }
   .row:hover { background: var(--fill); }
   .row.active { background: var(--fill-hover); font-weight: 600; }

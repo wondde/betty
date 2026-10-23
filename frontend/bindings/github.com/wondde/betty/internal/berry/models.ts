@@ -266,6 +266,8 @@ export interface ProposalPayload {
     "status": string;
     "assignee_id": string | null;
     "due_date": string | null;
+    "priority": string;
+    "area": string;
     "source_url": string;
     "_routing"?: Routing | null;
 }

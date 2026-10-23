@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // Board is the subset of the BerryTicket board (/api/state) the app uses:
@@ -85,6 +86,8 @@ type ProposalPayload struct {
 	Status      string   `json:"status"`
 	AssigneeID  *string  `json:"assignee_id"`
 	DueDate     *string  `json:"due_date"`
+	Priority    string   `json:"priority"`
+	Area        string   `json:"area"`
 	SourceURL   string   `json:"source_url"`
 	Routing     *Routing `json:"_routing,omitempty"`
 }
@@ -208,7 +211,52 @@ type DesignQuestion struct {
 func (c *Client) Board(ctx context.Context) (Board, error) {
 	var b Board
 	err := c.do(ctx, http.MethodGet, "/api/state", nil, true, &b)
+	b.colorProjects()
 	return b, err
+}
+
+// Projects are created with a shared default colour (the server and discovery
+// use different purples), so every project looks the same. A colour that only
+// one project has was picked on purpose and is kept; shared or default colours
+// get the next palette colour no other project uses. "Project undecided" is grey.
+const undecidedProject = "berry-project-undecided"
+
+var defaultProjectColors = map[string]bool{"#7564d9": true, "#6175ba": true}
+
+var projectPalette = []string{"#0a84ff", "#30a46c", "#f76b15", "#d6409f", "#12a594", "#e5484d", "#8e4ec6", "#c99a06", "#3e63dd", "#978365"}
+
+func (b *Board) colorProjects() {
+	uses := map[string]int{}
+	for _, p := range b.Projects {
+		uses[strings.ToLower(p.Color)]++
+	}
+	keep := func(p Project) bool {
+		c := strings.ToLower(p.Color)
+		return c != "" && uses[c] == 1 && !defaultProjectColors[c]
+	}
+	taken := map[string]bool{}
+	for _, p := range b.Projects {
+		if p.ID != undecidedProject && keep(p) {
+			taken[strings.ToLower(p.Color)] = true
+		}
+	}
+	next := 0
+	for i := range b.Projects {
+		p := &b.Projects[i]
+		if p.ID == undecidedProject {
+			p.Color = "#8b8d98"
+			continue
+		}
+		if keep(*p) {
+			continue
+		}
+		for n := 0; n < len(projectPalette) && taken[projectPalette[next%len(projectPalette)]]; n++ {
+			next++
+		}
+		p.Color = projectPalette[next%len(projectPalette)]
+		taken[p.Color] = true
+		next++
+	}
 }
 
 func (c *Client) BoardRevision(ctx context.Context) (string, error) {

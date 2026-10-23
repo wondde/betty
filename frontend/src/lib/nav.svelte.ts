@@ -13,11 +13,13 @@ export type Scope =
   | { kind: 'project'; id: string }
   | { kind: 'member'; id: string }
 
-export const nav = $state<{ scope: Scope; selected: string | null; query: string; showDone: boolean }>({
+// project narrows the team-wide lists and the board ('' = all projects).
+export const nav = $state<{ scope: Scope; selected: string | null; query: string; showDone: boolean; project: string }>({
   scope: { kind: 'mine' },
   selected: null,
   query: '',
   showDone: false,
+  project: '',
 })
 
 export function go(scope: Scope) {
@@ -28,6 +30,9 @@ export function go(scope: Scope) {
 export function sameScope(a: Scope, b: Scope): boolean {
   return a.kind === b.kind && ('id' in a ? a.id : '') === ('id' in b ? b.id : '')
 }
+
+// Team-wide task views that get the project chips.
+export const byProject = (s: Scope) => ['team', 'unassigned', 'member', 'board'].includes(s.kind)
 
 // Views without a task list (no search, no add field, no detail pane).
 export const isTaskList = (s: Scope) => !['inbox', 'calendar', 'teamStatus', 'history', 'github', 'admin'].includes(s.kind)

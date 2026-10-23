@@ -11,9 +11,11 @@
     isNew = false,
     selected = false,
     showAssignee = false,
+    showProject = true,
+    showStatus = true,
     onselect,
     onerror,
-  }: { ticket: Ticket; isNew?: boolean; selected?: boolean; showAssignee?: boolean; onselect: () => void; onerror: (m: string) => void } = $props()
+  }: { ticket: Ticket; isNew?: boolean; selected?: boolean; showAssignee?: boolean; showProject?: boolean; showStatus?: boolean; onselect: () => void; onerror: (m: string) => void } = $props()
 
   let finishing = $state(false)
   let busy = $state(false)
@@ -62,15 +64,15 @@
     <div class="meta">
       <span class="num">BT-{ticket.number}</span>
       {#if isNew}<span class="new">NEW</span>{/if}
-      {#if ticket.project}<span class="project"><i style:background={ticket.project.color}></i>{ticket.project.name}</span>{/if}
-      {#if working || ticket.status === 'blocked'}<span class="status {ticket.status}">{statusLabel[ticket.status]}</span>{/if}
+      {#if showProject && ticket.project}<span class="project" style:--pc={ticket.project.color}>{ticket.project.name}</span>{/if}
+      {#if showStatus && (working || ticket.status === 'blocked')}<span class="status {ticket.status}">{statusLabel[ticket.status]}</span>{/if}
       {#if ticket.priority === 'urgent' || ticket.priority === 'high'}<span class="prio {ticket.priority}">{ticket.priority === 'urgent' ? '긴급' : '중요'}</span>{/if}
       {#if due}<span class="due {due.tone}">{due.label}</span>{/if}
     </div>
   </div>
 
   {#if showAssignee}
-    <span class="who" title={assignee?.name ?? '담당자 없음'} class:none={!assignee}>{assignee ? initial(assignee.name) : '?'}</span>
+    <span class="who" title={assignee?.name ?? '담당자 없음'} class:none={!assignee}>{assignee ? initial(assignee.name) : ''}</span>
   {/if}
   {#if !done && ticket.status !== 'blocked'}
     <button class="quick" class:working onclick={(e) => (e.stopPropagation(), set(working ? 'todo' : 'in_progress'))} disabled={busy} title={working ? '할 일로 되돌리기' : '시작하기'} aria-label={working ? '할 일로 되돌리기' : '시작하기'}>
@@ -101,8 +103,7 @@
   .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 2px; font-size: 11px; color: var(--fg3); }
   .num { font-variant-numeric: tabular-nums; font-weight: 600; }
   .new { padding: 0 5px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 9.5px; font-weight: 800; }
-  .project { display: inline-flex; align-items: center; gap: 4px; color: var(--fg2); }
-  .project i { width: 7px; height: 7px; border-radius: 50%; }
+  .project { padding: 0 6px; border-radius: 5px; font-weight: 600; color: color-mix(in srgb, var(--pc) 80%, var(--fg)); background: color-mix(in srgb, var(--pc) 16%, transparent); }
   .status { padding: 0 6px; border-radius: 5px; font-weight: 600; }
   .status.in_progress { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .status.blocked { color: var(--red); background: color-mix(in srgb, var(--red) 13%, transparent); }
@@ -113,10 +114,10 @@
   .due.overdue, .due.today { color: var(--red); }
   .due.soon { color: var(--orange); }
   .who { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; background: var(--fill-hover); color: var(--fg2); }
-  .who.none { background: transparent; box-shadow: inset 0 0 0 1px var(--line); color: var(--fg3); }
+  .who.none { background: transparent; }
   .quick { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--fill); opacity: 0; }
   .quick svg { width: 10px; height: 10px; fill: var(--fg2); }
-  .row:hover .quick, .quick:focus-visible, .quick.working { opacity: 1; }
+  .row:hover .quick, .quick:focus-visible { opacity: 1; }
   .quick.working svg { fill: var(--accent); }
   .quick:hover { background: var(--fill-hover); }
   button:disabled { opacity: 0.5; }

@@ -88,6 +88,24 @@ export function groupByStatus(tickets: Ticket[]): { title: string; items: Ticket
   return out
 }
 
+export type Group = { key: string; title: string; color?: string; items: Ticket[] }
+
+// Team-wide grouping: one section per project in board order (undecided last),
+// active work first inside each, then the nearest deadline.
+export function groupByProject(tickets: Ticket[], projects: { id: string; name: string; color: string }[]): Group[] {
+  const order = new Map(projects.map((p, i) => [p.id, p.id === 'berry-project-undecided' ? 1e6 : i]))
+  const sorted = tickets.slice().sort((a, b) =>
+    (order.get(a.project?.id ?? '') ?? 1e7) - (order.get(b.project?.id ?? '') ?? 1e7) ||
+    statusOrder[a.status] - statusOrder[b.status] || (daysUntil(a.due_date) ?? 9999) - (daysUntil(b.due_date) ?? 9999) || b.number - a.number)
+  const out: Group[] = []
+  for (const t of sorted) {
+    const key = t.project?.id ?? ''
+    if (out.at(-1)?.key !== key) out.push({ key, title: t.project?.name ?? '프로젝트 없음', color: t.project?.color, items: [] })
+    out.at(-1)!.items.push(t)
+  }
+  return out
+}
+
 // Initial for the little avatar dot next to a task.
 export function initial(name?: string): string {
   return name ? Array.from(name)[0] : ''
