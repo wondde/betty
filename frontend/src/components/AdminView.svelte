@@ -18,6 +18,7 @@
     { key: 'assignment_notifications_enabled', label: '배정 알림 (디스코드)', note: '새 배정을 공유 채널에 요약해 보내요.', guarded: true },
     { key: 'reminders_enabled', label: '마감 리마인더 (디스코드)', note: '내일 마감인 업무를 하루 한 번 알려요.', guarded: true },
     { key: 'source_reactions_enabled', label: '원문에 체크 반응 달기', note: '업무로 정리한 디스코드 메시지에 반응을 달아요.', guarded: true },
+    { key: 'stale_nudges_enabled', label: '조용한 일 확인 (개인 채널)', note: '5일 넘게 소식 없는 진행 중인 일, 10일 넘게 시작 안 한 일을 평일 낮에 본인 업무 채널에서 한 번씩 물어봐요. 한 사람에 하루 한 번, 같은 일은 일주일에 한 번.', guarded: true },
   ]
 
   async function run(fn: () => Promise<void>, note: string) {
