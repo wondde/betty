@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ask } from '../lib/ask.svelte'
   // 팀·연결 설정: automation switches, projects and their Discord channels, people (Discord /
   // work channel / GitHub), and the GitHub repositories the server reads.
   import { Betty } from '../../bindings/github.com/wondde/betty'
@@ -32,14 +33,15 @@
     }
   }
 
-  function toggle(sw: (typeof switches)[number]) {
+  async function toggle(sw: (typeof switches)[number]) {
     const next = !v.settings?.[sw.key]
-    if (next && sw.guarded && !confirm(`"${sw.label}"을(를) 켜면 팀 디스코드에 메시지나 반응이 가요. 팀에서 꺼 두기로 한 설정이에요. 그래도 켤까요?`)) return
+    if (next && sw.guarded && !(await ask(`"${sw.label}"을(를) 켜면 팀 디스코드에 메시지나 반응이 가요.\n팀에서 꺼 두기로 한 설정이에요. 그래도 켤까요?`, '켜기', true))) return
     run(() => Betty.SetSetting(sw.key, next), `${sw.label}: ${next ? '켰어요' : '껐어요'}`)
   }
 
   // ---------- projects ----------
-  let editingProject = $state<{ id: string; name: string; channels: string[] } | null>(null)
+  let editingProject = $state<{ id: string; name: string; channels: string[]; color: string } | null>(null)
+  const swatches = ['#0a84ff', '#30a46c', '#f76b15', '#d6409f', '#12a594', '#e5484d', '#8e4ec6', '#c99a06', '#3e63dd', '#978365']
   let channelPick = $state('')
   const channelName = (id: string) => {
     const c = v.discordChannels?.find((c) => c.id === id)
@@ -50,13 +52,13 @@
 
   function editProject(id = '') {
     const p = v.projects?.find((p) => p.id === id)
-    editingProject = { id, name: p?.name ?? '', channels: id ? projectChannels(id) : [] }
+    editingProject = { id, name: p?.name ?? '', channels: id ? projectChannels(id) : [], color: p?.color ?? '' }
     channelPick = ''
   }
   async function saveProject() {
     const p = editingProject!
     if (!p.name.trim()) return onerror('프로젝트 이름을 적어 주세요')
-    if (await run(() => Betty.SaveProject(p.id, p.name.trim(), p.channels), p.id ? '프로젝트를 바꿨어요' : '프로젝트를 만들었어요')) editingProject = null
+    if (await run(() => Betty.SaveProject(p.id, p.name.trim(), p.channels, p.color), p.id ? '프로젝트를 바꿨어요' : '프로젝트를 만들었어요')) editingProject = null
   }
 
   // ---------- members ----------
@@ -121,7 +123,7 @@
     {#each v.github?.repos ?? [] as r (r.id)}
       <div class="row">
         <div class="text"><b>{r.full_name}</b><small>{projectName(r.project_id)} · {r.error ? `오류: ${r.error}` : r.synced_at ? `마지막 동기화 ${new Date(r.synced_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '아직 불러오지 않았어요'}</small></div>
-        <button class="edit danger" disabled={busy} onclick={() => confirm(`${r.full_name} 연결을 해제할까요? 연결된 업무 링크도 사라져요.`) && run(() => Betty.RemoveRepo(r.id), '저장소 연결을 해제했어요')}>해제</button>
+        <button class="edit danger" disabled={busy} onclick={async () => (await ask(`${r.full_name} 연결을 해제할까요?\n연결된 업무 링크도 사라져요.`, '해제', true)) && run(() => Betty.RemoveRepo(r.id), '저장소 연결을 해제했어요')}>해제</button>
       </div>
     {:else}
       <p class="none">연결된 저장소가 없어요.</p>
@@ -143,6 +145,12 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-label="프로젝트">
     <h1>{editingProject.id ? '프로젝트 편집' : '새 프로젝트'}</h1>
     <label>이름<input bind:value={editingProject.name} /></label>
+    {#if editingProject.id}
+      <p class="lbl">색</p>
+      <div class="swatches" role="radiogroup" aria-label="프로젝트 색">
+        {#each swatches as c (c)}<button role="radio" aria-checked={editingProject.color === c} aria-label={c} class:on={editingProject.color === c} style:background={c} onclick={() => (editingProject!.color = c)}></button>{/each}
+      </div>
+    {/if}
     <p class="lbl">대화를 모을 디스코드 채널</p>
     <div class="chips">
       {#each editingProject.channels as id (id)}
@@ -203,6 +211,9 @@
   .sheet input, .sheet select { font: inherit; font-size: 13px; color: var(--fg); border: none; outline: none; background: var(--fill); border-radius: 7px; padding: 6px 8px; }
   .sheet input:focus, .sheet select:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
   .lbl { margin: 0; font-size: 12px; color: var(--fg2); }
+  .swatches { display: flex; gap: 6px; }
+  .swatches button { width: 22px; height: 22px; border-radius: 50%; }
+  .swatches button.on { box-shadow: 0 0 0 2px var(--sheet, #fff), 0 0 0 4px currentColor; color: var(--fg); }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 8px; border-radius: 6px; background: var(--fill); font-size: 12px; }
   .chip button { color: var(--fg3); padding: 0 4px; }

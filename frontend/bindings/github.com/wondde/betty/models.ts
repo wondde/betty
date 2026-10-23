@@ -34,6 +34,7 @@ export interface View {
     "projectChannels": berry$0.ProjectChannel[] | null;
     "progress": { [_ in string]?: berry$0.TaskProgress } | null;
     "designLinks": { [_ in string]?: berry$0.DesignLink[] | null } | null;
+    "trash": berry$0.TrashItem[] | null;
 
     /**
      * my open tasks not looked at yet

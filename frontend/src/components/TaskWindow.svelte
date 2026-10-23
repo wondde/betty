@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { ask, asking } from '../lib/ask.svelte'
+  import AskDialog from './AskDialog.svelte'
   // Main window, Mac three-pane layout:
   //   sidebar (my tasks · team · unassigned · review inbox · projects · people)
   //   | list for that scope, with search (⌘F) and an add field
@@ -27,6 +29,7 @@
   import Sheet from './Sheet.svelte'
   import Board from './Board.svelte'
   import CaptureSheet from './CaptureSheet.svelte'
+  import TrashView from './TrashView.svelte'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
   let refreshing = $state(false)
@@ -81,6 +84,7 @@
     if (s.kind === 'history') return '자동 정리 기록'
     if (s.kind === 'github') return '개발 현황'
     if (s.kind === 'admin') return '팀·연결 설정'
+    if (s.kind === 'trash') return '휴지통'
     if (s.kind === 'project') return v.projects?.find((p) => p.id === s.id)?.name ?? '프로젝트'
     return v.members?.find((m) => m.id === s.id)?.name ?? '팀원'
   })
@@ -151,6 +155,7 @@
       case 'history': return '봇이 스스로 연결하거나 진행·완료 처리한 기록 · 틀리면 되돌리세요'
       case 'github': return '연결된 저장소의 이슈와 PR · 어떤 업무인지 연결해 두면 진행이 자동으로 반영돼요'
       case 'admin': return '자동화, 프로젝트와 채널, 팀원, GitHub 저장소'
+      case 'trash': return '지운 업무 · 베티가 같은 일을 다시 만들지 않아요'
       case 'mine': return `${todayLabel()} · ${summary}`
       default: return summary
     }
@@ -179,6 +184,17 @@
     }
   }
 
+  async function trash(t: Ticket) {
+    if (!(await ask(`BT-${t.number} "${t.title}"을(를) 휴지통으로 옮길까요?\n휴지통에서 되살릴 수 있어요.`, '휴지통으로', true))) return
+    try {
+      await Betty.Delete(t.id)
+      nav.selected = null
+      say('휴지통으로 옮겼어요', true)
+    } catch (err) {
+      say(message(err))
+    }
+  }
+
   // ↑/↓ move the selection through the list; Esc clears search, then the selection.
   function keydown(e: KeyboardEvent) {
     const target = e.target as HTMLElement
@@ -189,7 +205,14 @@
       if (typing) target.blur()
       return
     }
-    if (typing || sheet || capturing || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
+    // ⌘⌫ moves the selected task to the trash (only outside text fields).
+    if (!typing && !sheet && !capturing && e.metaKey && e.key === 'Backspace' && selected && isTaskList(nav.scope)) {
+      e.preventDefault()
+      const t = selected
+      trash(t)
+      return
+    }
+    if (typing || sheet || capturing || asking.current || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
     e.preventDefault()
     const i = flat.findIndex((t) => t.id === nav.selected)
     const next = e.key === 'ArrowDown' ? Math.min(flat.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1)
@@ -246,6 +269,8 @@
           <GitHubView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'admin'}
           <AdminView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'trash'}
+          <TrashView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'board'}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
@@ -292,6 +317,7 @@
       <TaskDetail ticket={selected} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
     {/if}
   </div>
+  <AskDialog />
   {#if capturing}<CaptureSheet onclose={() => (capturing = false)} onsent={(m) => say(m, true)} />{/if}
   {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
 {/if}

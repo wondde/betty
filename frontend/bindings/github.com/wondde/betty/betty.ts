@@ -78,6 +78,13 @@ export function Create($in: berry$0.CreateInput): $CancellablePromise<berry$0.Ti
     return $Call.ByID(1299547056, $in);
 }
 
+/**
+ * Delete moves a task to the trash (restorable) against the version last loaded.
+ */
+export function Delete(id: string): $CancellablePromise<void> {
+    return $Call.ByID(2780696335, id);
+}
+
 export function DismissDesignQuestion(id: string): $CancellablePromise<void> {
     return $Call.ByID(3883525622, id);
 }
@@ -92,6 +99,13 @@ export function DismissMeeting(id: string): $CancellablePromise<void> {
 
 export function DismissProposal(id: string): $CancellablePromise<void> {
     return $Call.ByID(2562414710, id);
+}
+
+/**
+ * EditChecklist changes one checklist item against the revision last loaded.
+ */
+export function EditChecklist(id: string, e: berry$0.ChecklistEdit): $CancellablePromise<void> {
+    return $Call.ByID(1297470176, id, e);
 }
 
 /**
@@ -152,6 +166,10 @@ export function RemoveRepo(id: string): $CancellablePromise<void> {
     return $Call.ByID(1208628432, id);
 }
 
+export function Restore(id: string): $CancellablePromise<void> {
+    return $Call.ByID(2199355758, id);
+}
+
 /**
  * SaveMeeting creates a meeting (id "") or edits one; editing is based on the version last loaded.
  */
@@ -167,8 +185,8 @@ export function SaveOrder(ids: string[] | null): $CancellablePromise<void> {
     return $Call.ByID(2108905011, ids);
 }
 
-export function SaveProject(id: string, name: string, channelIDs: string[] | null): $CancellablePromise<void> {
-    return $Call.ByID(3217617098, id, name, channelIDs);
+export function SaveProject(id: string, name: string, channelIDs: string[] | null, color: string): $CancellablePromise<void> {
+    return $Call.ByID(3217617098, id, name, channelIDs, color);
 }
 
 export function SetAutostart(on: boolean): $CancellablePromise<void> {

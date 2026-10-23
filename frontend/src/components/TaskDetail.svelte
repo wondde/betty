@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ask } from '../lib/ask.svelte'
   // Right-hand pane: edit any field of the selected task. Every change is saved on its own
   // (status/assignee/date on change, text on blur) against the version last loaded.
   import { Betty } from '../../bindings/github.com/wondde/betty'
@@ -67,7 +68,40 @@
 
   // What the automations know about this task: confirmed progress, linked work, and their changes.
   const progress = $derived(app.view.progress?.[ticket.id])
-  const hasProgress = $derived(Boolean(progress?.finished?.length || progress?.remaining?.length))
+  const done = $derived(progress?.finished?.length ?? 0)
+  const total = $derived(done + (progress?.remaining?.length ?? 0))
+
+  // Checklist = the task's progress record: people and the automations share it.
+  let newItem = $state('')
+  let editing = $state<string | null>(null)
+  let checking = $state(false)
+  async function check(e: { action: string; list: string; index: number; text: string }, after?: () => void) {
+    checking = true
+    try {
+      await Betty.EditChecklist(ticket.id, e)
+      after?.()
+    } catch (err) {
+      onerror(message(err))
+    } finally {
+      checking = false
+    }
+  }
+  function finishEdit(item: { list: string; index: number; step: { text: string } }, value: string) {
+    editing = null
+    if (value.trim() && value.trim() !== item.step.text) check({ action: 'edit', list: item.list, index: item.index, text: value.trim() })
+  }
+  const focus = (el: HTMLElement) => { el.focus() }
+
+  async function trash() {
+    if (!(await ask(`BT-${ticket.number} "${ticket.title}"을(를) 휴지통으로 옮길까요?\n휴지통에서 되살릴 수 있어요.`, '휴지통으로', true))) return
+    try {
+      await Betty.Delete(ticket.id)
+      nav.selected = null
+      onsaved('휴지통으로 옮겼어요')
+    } catch (e) {
+      onerror(message(e))
+    }
+  }
   const githubItems = $derived((app.view.github?.items ?? []).filter((i) => i.ticket_ids?.includes(ticket.id)))
   const designs = $derived(app.view.designLinks?.[ticket.id] ?? [])
   const changeLabel: Record<string, string> = { linked: 'GitHub 연결', progressed: '진행 반영', completed: '완료 처리' }
@@ -148,20 +182,30 @@
   <label class="desc-label" for="desc">설명</label>
   <textarea id="desc" class="desc" bind:value={description} onblur={saveText} placeholder="설명을 적어 주세요"></textarea>
 
-  {#if hasProgress}
-    <section class="block" aria-label="진행 상황">
-      <h4>진행 상황</h4>
-      {#if ticket.status === 'done' && progress?.remaining?.length}<p class="note">완료로 표시된 일이에요. 아래는 완료 전에 정리된 내용이에요.</p>{/if}
-      <ul class="steps">
-        {#each progress?.finished ?? [] as step}
-          <li class="ok"><span class="mark" aria-label="끝남">✓</span><span class="text">{step.text}</span>{#if step.url}<button class="evidence" onclick={() => Betty.OpenURL(step.url)} title={step.quote}>근거</button>{/if}</li>
-        {/each}
-        {#each progress?.remaining ?? [] as step}
-          <li><span class="mark" aria-label="남음">○</span><span class="text">{step.text}</span>{#if step.url}<button class="evidence" onclick={() => Betty.OpenURL(step.url)} title={step.quote}>근거</button>{/if}</li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
+  <section class="block" aria-label="체크리스트">
+    <h4>체크리스트{#if total} <span class="count">{done}/{total}</span>{/if}</h4>
+    {#if ticket.status === 'done' && progress?.remaining?.length}<p class="note">완료로 표시된 일이에요. 남은 항목은 완료 전에 정리된 내용이에요.</p>{/if}
+    <ul class="steps">
+      {#each [...(progress?.remaining ?? []).map((step, index) => ({ step, index, list: 'remaining' })), ...(progress?.finished ?? []).map((step, index) => ({ step, index, list: 'finished' }))] as item (item.list + item.index + item.step.text)}
+        <li class:ok={item.list === 'finished'}>
+          <button class="box" class:on={item.list === 'finished'} disabled={checking} onclick={() => check({ action: 'toggle', list: item.list, index: item.index, text: '' })} aria-label={item.list === 'finished' ? '체크 해제' : '완료 체크'}>
+            <svg viewBox="0 0 14 14" aria-hidden="true"><rect x="1" y="1" width="12" height="12" rx="3.5" /><path d="M4 7.2l2 2L10 5" /></svg>
+          </button>
+          {#if editing === item.list + item.index}
+            <input class="edit" value={item.step.text} onblur={(e) => finishEdit(item, (e.target as HTMLInputElement).value)}
+              onkeydown={(e) => { if (e.key === 'Enter' && !e.isComposing) (e.target as HTMLInputElement).blur(); else if (e.key === 'Escape') editing = null }} use:focus />
+          {:else}
+            <span class="text" role="button" tabindex="-1" ondblclick={() => !item.step.quote && !item.step.url && (editing = item.list + item.index)}
+              onkeydown={(e) => e.key === 'Enter' && !item.step.quote && !item.step.url && (editing = item.list + item.index)} title={item.step.quote || item.step.url ? '자동 정리가 남긴 항목이에요' : '두 번 눌러 고치기'}>{item.step.text}</span>
+          {/if}
+          {#if item.step.url}<button class="evidence" onclick={() => Betty.OpenURL(item.step.url)} title={item.step.quote}>근거</button>{/if}
+          <button class="remove" disabled={checking} onclick={() => check({ action: 'remove', list: item.list, index: item.index, text: '' })} aria-label="항목 지우기" title="지우기">✕</button>
+        </li>
+      {/each}
+    </ul>
+    <input class="add" bind:value={newItem} placeholder="＋ 항목 추가" disabled={checking}
+      onkeydown={(e) => e.key === 'Enter' && !e.isComposing && newItem.trim() && check({ action: 'add', list: 'remaining', index: 0, text: newItem.trim() }, () => (newItem = ''))} aria-label="체크리스트 항목 추가" />
+  </section>
 
   <section class="block" aria-label="연결">
     <h4>연결</h4>
@@ -196,6 +240,7 @@
       </ul>
     {/if}
   </section>
+  <button class="trash" onclick={trash}>휴지통으로 옮기기</button>
   <p class="stamp">{#if ticket.created_at}만든 날 {fmt(ticket.created_at)} · {/if}마지막 변경 {fmt(ticket.updated_at)}{#if saving} · 저장 중…{/if}</p>
 </section>
 
@@ -234,10 +279,24 @@
   h4 { margin: 4px 0 2px; font-size: 12px; font-weight: 600; color: var(--fg3); }
   .note { margin: 0; font-size: 12px; color: var(--fg3); }
   .steps, .changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-  .steps li { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; line-height: 1.45; user-select: text; -webkit-user-select: text; }
-  .mark { flex: none; width: 14px; color: var(--fg3); }
-  .ok .mark { color: var(--green); }
-  .ok .text { color: var(--fg2); }
+  .steps li { display: flex; align-items: flex-start; gap: 7px; padding: 2px 0; font-size: 12.5px; line-height: 1.45; }
+  .box { flex: none; width: 16px; height: 18px; display: grid; place-items: center; }
+  .box svg { width: 14px; height: 14px; fill: none; stroke: var(--fg3); stroke-width: 1.3; }
+  .box path { stroke: transparent; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .box.on rect { fill: var(--green); stroke: var(--green); }
+  .box.on path { stroke: #fff; }
+  .box:hover rect { stroke: var(--accent); }
+  .ok .text { color: var(--fg3); text-decoration: line-through; }
+  .count { font-weight: 500; margin-left: 4px; }
+  .remove { flex: none; width: 18px; height: 18px; border-radius: 5px; font-size: 10px; color: var(--fg3); opacity: 0; }
+  .steps li:hover .remove { opacity: 1; }
+  .remove:hover { background: var(--fill-hover); color: var(--red); }
+  .edit, .add { height: 24px; padding: 0 6px; font-size: 12.5px; }
+  .edit { flex: 1; min-width: 0; }
+  .add { margin-top: 2px; background: transparent; }
+  .add:hover, .add:focus { background: var(--fill); }
+  .trash { align-self: flex-start; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--red); }
+  .trash:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
   .text { flex: 1; min-width: 0; }
   .evidence { flex: none; font-size: 11px; color: var(--accent); }
   .link { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 8px; border-radius: 7px; background: var(--fill); text-align: left; font-size: 12px; }

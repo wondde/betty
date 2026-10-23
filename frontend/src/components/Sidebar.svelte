@@ -27,6 +27,7 @@
     { scope: { kind: 'history' } as Scope, icon: '↺', label: '자동 정리 기록', count: 0 },
     { scope: { kind: 'github' } as Scope, icon: '⇄', label: '개발 현황', count: v.github?.suggestions?.length ?? 0 },
     { scope: { kind: 'admin' } as Scope, icon: '⚙︎', label: '팀·연결 설정', count: 0 },
+    { scope: { kind: 'trash' } as Scope, icon: '⌫', label: '휴지통', count: v.trash?.length ?? 0 },
   ])
   const projects = $derived((v.projects ?? []).map((p) => ({ ...p, count: open.filter((t) => t.project?.id === p.id).length })))
   const members = $derived((v.members ?? []).map((m) => ({ ...m, count: open.filter((t) => t.assignee_id === m.id).length })))

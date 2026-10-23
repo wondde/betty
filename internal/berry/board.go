@@ -23,6 +23,7 @@ type Board struct {
 	ProjectChannels []ProjectChannel        `json:"project_channels"`
 	Progress        map[string]TaskProgress `json:"progress"`     // by ticket id
 	DesignLinks     map[string][]DesignLink `json:"design_links"` // by ticket id
+	Trash           []TrashItem             `json:"trash"`
 	Revision        string                  `json:"revision"`
 }
 
@@ -31,6 +32,39 @@ type TaskProgress struct {
 	Finished  []ProgressStep `json:"finished"`
 	Remaining []ProgressStep `json:"remaining"`
 	UpdatedAt string         `json:"updated_at"`
+	Revision  string         `json:"revision"`
+}
+
+// TrashItem is a task someone moved to the trash; it can be restored.
+type TrashItem struct {
+	ID        string `json:"id"`
+	Number    int    `json:"number"`
+	Title     string `json:"title"`
+	ProjectID string `json:"project_id"`
+	Status    string `json:"status"`
+	DeletedAt string `json:"deleted_at"`
+	DeletedBy string `json:"deleted_by"`
+}
+
+// ChecklistEdit is one change to a task's checklist (its progress record).
+type ChecklistEdit struct {
+	Action string `json:"action"` // add | toggle | edit | remove
+	List   string `json:"list"`   // remaining | finished (not for add)
+	Index  int    `json:"index"`
+	Text   string `json:"text"`
+}
+
+func (c *Client) TrashTicket(ctx context.Context, id, version string) error {
+	return c.do(ctx, http.MethodDelete, "/api/tickets/"+url.PathEscape(id), map[string]any{"expected_updated_at": version}, true, nil)
+}
+
+func (c *Client) RestoreTicket(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodPost, "/api/tickets/"+url.PathEscape(id)+"/restore", map[string]any{}, true, nil)
+}
+
+func (c *Client) EditChecklist(ctx context.Context, id, revision string, e ChecklistEdit) error {
+	body := map[string]any{"action": e.Action, "list": e.List, "index": e.Index, "text": e.Text, "expected_revision": revision}
+	return c.do(ctx, http.MethodPost, "/api/tickets/"+url.PathEscape(id)+"/checklist", body, true, nil)
 }
 
 type ProgressStep struct {
@@ -444,8 +478,11 @@ func (c *Client) RemoveRepo(ctx context.Context, id string) error {
 
 // ---------- team settings ----------
 
-func (c *Client) SaveProject(ctx context.Context, id, name string, channelIDs []string) error {
+func (c *Client) SaveProject(ctx context.Context, id, name string, channelIDs []string, color string) error {
 	body := map[string]any{"name": name, "channel_ids": channelIDs}
+	if color != "" && id != "" {
+		body["color"] = color
+	}
 	if id == "" {
 		return c.do(ctx, http.MethodPost, "/api/projects", body, true, nil)
 	}

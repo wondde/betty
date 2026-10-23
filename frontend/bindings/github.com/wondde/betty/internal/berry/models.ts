@@ -38,6 +38,23 @@ export interface ChangeTicket {
 }
 
 /**
+ * ChecklistEdit is one change to a task's checklist (its progress record).
+ */
+export interface ChecklistEdit {
+    /**
+     * add | toggle | edit | remove
+     */
+    "action": string;
+
+    /**
+     * remaining | finished (not for add)
+     */
+    "list": string;
+    "index": number;
+    "text": string;
+}
+
+/**
  * CreateInput adds a task. AssigneeID nil = my own task.
  */
 export interface CreateInput {
@@ -287,6 +304,7 @@ export interface TaskProgress {
     "finished": ProgressStep[] | null;
     "remaining": ProgressStep[] | null;
     "updated_at": string;
+    "revision": string;
 }
 
 export interface Ticket {
@@ -307,4 +325,17 @@ export interface Ticket {
     "assignee_id"?: string | null;
     "area"?: string;
     "created_at"?: string;
+}
+
+/**
+ * TrashItem is a task someone moved to the trash; it can be restored.
+ */
+export interface TrashItem {
+    "id": string;
+    "number": number;
+    "title": string;
+    "project_id": string;
+    "status": string;
+    "deleted_at": string;
+    "deleted_by": string;
 }

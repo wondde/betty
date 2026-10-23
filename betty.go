@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.6.0"
+const version = "0.7.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -45,6 +45,7 @@ type View struct {
 	ProjectChannels  []berry.ProjectChannel        `json:"projectChannels"`
 	Progress         map[string]berry.TaskProgress `json:"progress"`
 	DesignLinks      map[string][]berry.DesignLink `json:"designLinks"`
+	Trash            []berry.TrashItem             `json:"trash"`
 	New              []string                      `json:"new"` // my open tasks not looked at yet
 	Order            []string                      `json:"order"`
 	HintDone         bool                          `json:"hintDone"`
@@ -102,7 +103,7 @@ func (b *Betty) View() View {
 		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
 		v.Meetings = s.Calendar.Meetings
 		v.GitHub, v.Settings, v.DiscordChannels, v.ProjectChannels = s.GitHub, s.Settings, s.DiscordChannels, s.ProjectChannels
-		v.Progress, v.DesignLinks = s.Progress, s.DesignLinks
+		v.Progress, v.DesignLinks, v.Trash = s.Progress, s.DesignLinks, s.Trash
 		seen := toSet(d.Seen)
 		for _, t := range mine(s) {
 			if !seen[t.ID] {
@@ -480,8 +481,32 @@ func (b *Betty) RemoveRepo(id string) error {
 
 // ---------- team settings ----------
 
-func (b *Betty) SaveProject(id, name string, channelIDs []string) error {
-	return b.inbox(func(ctx context.Context) error { return b.client.SaveProject(ctx, id, name, channelIDs) })
+func (b *Betty) SaveProject(id, name string, channelIDs []string, color string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.SaveProject(ctx, id, name, channelIDs, color) })
+}
+
+// ---------- trash and checklist ----------
+
+// Delete moves a task to the trash (restorable) against the version last loaded.
+func (b *Betty) Delete(id string) error {
+	t, ok := b.boardTicket(id)
+	if !ok {
+		return errors.New("업무를 찾지 못했어요. 새로고침해 주세요")
+	}
+	return b.inbox(func(ctx context.Context) error { return b.client.TrashTicket(ctx, id, t.UpdatedAt) })
+}
+
+func (b *Betty) Restore(id string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.RestoreTicket(ctx, id) })
+}
+
+// EditChecklist changes one checklist item against the revision last loaded.
+func (b *Betty) EditChecklist(id string, e berry.ChecklistEdit) error {
+	revision := ""
+	if s := b.prefs.Get().Snapshot; s != nil {
+		revision = s.Progress[id].Revision
+	}
+	return b.inbox(func(ctx context.Context) error { return b.client.EditChecklist(ctx, id, revision, e) })
 }
 
 func (b *Betty) SaveMember(id string, in berry.MemberInput) error {

@@ -25,6 +25,11 @@
   const done = $derived(ticket.status === 'done')
   const working = $derived(ticket.status === 'in_progress')
   const assignee = $derived(app.view.members?.find((m) => m.id === ticket.assignee_id))
+  const checklist = $derived.by(() => {
+    const p = app.view.progress?.[ticket.id]
+    const done = p?.finished?.length ?? 0
+    return { done, total: done + (p?.remaining?.length ?? 0) }
+  })
 
   async function set(status: string) {
     busy = true
@@ -68,6 +73,7 @@
       {#if showStatus && (working || ticket.status === 'blocked')}<span class="status {ticket.status}">{statusLabel[ticket.status]}</span>{/if}
       {#if ticket.priority === 'urgent' || ticket.priority === 'high'}<span class="prio {ticket.priority}">{ticket.priority === 'urgent' ? '긴급' : '중요'}</span>{/if}
       {#if due}<span class="due {due.tone}">{due.label}</span>{/if}
+      {#if checklist.total}<span class="checks" class:all={checklist.done === checklist.total}>☑ {checklist.done}/{checklist.total}</span>{/if}
     </div>
   </div>
 
@@ -111,6 +117,8 @@
   .prio.urgent { color: var(--red); }
   .prio.high { color: var(--orange); }
   .due { font-weight: 600; }
+  .checks { font-variant-numeric: tabular-nums; }
+  .checks.all { color: var(--green); }
   .due.overdue, .due.today { color: var(--red); }
   .due.soon { color: var(--orange); }
   .who { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; background: var(--fill-hover); color: var(--fg2); }

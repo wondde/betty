@@ -5,6 +5,7 @@ export type {
     Change,
     ChangeLink,
     ChangeTicket,
+    ChecklistEdit,
     CreateInput,
     DesignLink,
     DesignQuestion,
@@ -29,5 +30,6 @@ export type {
     ProposalPayload,
     Routing,
     TaskProgress,
-    Ticket
+    Ticket,
+    TrashItem
 } from "./models.js";
