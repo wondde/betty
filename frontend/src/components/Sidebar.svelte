@@ -98,6 +98,8 @@
 <style>
   .sidebar { width: 210px; flex: none; display: flex; flex-direction: column; padding: 46px 8px 8px; border-right: 0.5px solid var(--line); background: var(--sidebar, transparent); }
   nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+  nav > *, .area > * { flex-shrink: 0; } /* the list scrolls; rows never squash */
+  .area { display: flex; flex-direction: column; gap: 1px; }
   h3 { margin: 16px 10px 4px; font-size: 11px; font-weight: 700; color: var(--fg3); }
   h3 button { display: flex; align-items: center; gap: 4px; width: 100%; font: inherit; color: inherit; }
   h3 button:hover { color: var(--fg2); }
