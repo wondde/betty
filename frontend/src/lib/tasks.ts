@@ -1,4 +1,4 @@
-import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
+import type { GitHubItem, Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
 
 export const statusLabel: Record<string, string> = { todo: '할 일', in_progress: '진행 중', blocked: '막힘', done: '완료' }
 
@@ -91,4 +91,12 @@ export function groupByStatus(tickets: Ticket[]): { title: string; items: Ticket
 // Initial for the little avatar dot next to a task.
 export function initial(name?: string): string {
   return name ? Array.from(name)[0] : ''
+}
+
+// GitHub item stage in words, plus a tone for the badge colour.
+export function stageLabel(i: GitHubItem): [string, string] {
+  if (i.kind === 'pr' && i.stage === 'merged') return ['병합됨', 'merged']
+  if (i.kind === 'pr' && i.stage === 'closed') return ['병합 없이 닫힘', 'closed']
+  if (i.kind === 'issue' && i.state === 'closed') return i.state_reason === 'completed' ? ['완료됨', 'merged'] : ['하지 않기로 함', 'closed']
+  return ({ draft: ['준비 중', 'draft'], review_requested: ['리뷰 요청', 'review'] } as Record<string, [string, string]>)[i.stage] ?? ['진행 중', 'open']
 }

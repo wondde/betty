@@ -2,10 +2,10 @@
   // Right-hand pane: edit any field of the selected task. Every change is saved on its own
   // (status/assignee/date on change, text on blur) against the version last loaded.
   import { Betty } from '../../bindings/github.com/wondde/betty'
-  import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
+  import type { Change, Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
   import { nav } from '../lib/nav.svelte'
-  import { areaLabel, priorityLabel, dueOf } from '../lib/tasks'
+  import { areaLabel, priorityLabel, dueOf, stageLabel } from '../lib/tasks'
 
   let { ticket, onerror, onsaved }: { ticket: Ticket; onerror: (m: string) => void; onsaved: (m: string) => void } = $props()
 
@@ -64,6 +64,25 @@
       onerror(message(e))
     }
   }
+
+  // What the automations know about this task: confirmed progress, linked work, and their changes.
+  const progress = $derived(app.view.progress?.[ticket.id])
+  const hasProgress = $derived(Boolean(progress?.finished?.length || progress?.remaining?.length))
+  const githubItems = $derived((app.view.github?.items ?? []).filter((i) => i.ticket_ids?.includes(ticket.id)))
+  const designs = $derived(app.view.designLinks?.[ticket.id] ?? [])
+  const changeLabel: Record<string, string> = { linked: 'GitHub 연결', progressed: '진행 반영', completed: '완료 처리' }
+  let changes = $state<Change[] | null>(null)
+  let changesFor = ''
+  // Reload when another task is picked or this one changes; keep the old list while refreshing.
+  $effect(() => {
+    const id = ticket.id, key = id + '@' + ticket.updated_at
+    if (key === changesFor) return
+    if (!changesFor.startsWith(id + '@')) changes = null
+    changesFor = key
+    Betty.TaskHistory(id)
+      .then((items) => { if (changesFor === key) changes = items ?? [] })
+      .catch(() => { if (changesFor === key) changes = [] })
+  })
 
   const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')
 </script>
@@ -129,15 +148,60 @@
   <label class="desc-label" for="desc">설명</label>
   <textarea id="desc" class="desc" bind:value={description} onblur={saveText} placeholder="설명을 적어 주세요"></textarea>
 
-  <div class="links">
-    {#if ticket.source_url}<button onclick={() => Betty.OpenURL(ticket.source_url)}>Discord 원문 ↗</button>{/if}
-    <button onclick={() => Betty.OpenBoard()}>웹 보드 ↗</button>
-  </div>
+  {#if hasProgress}
+    <section class="block" aria-label="진행 상황">
+      <h4>진행 상황</h4>
+      {#if ticket.status === 'done' && progress?.remaining?.length}<p class="note">완료로 표시된 일이에요. 아래는 완료 전에 정리된 내용이에요.</p>{/if}
+      <ul class="steps">
+        {#each progress?.finished ?? [] as step}
+          <li class="ok"><span class="mark" aria-label="끝남">✓</span><span class="text">{step.text}</span>{#if step.url}<button class="evidence" onclick={() => Betty.OpenURL(step.url)} title={step.quote}>근거</button>{/if}</li>
+        {/each}
+        {#each progress?.remaining ?? [] as step}
+          <li><span class="mark" aria-label="남음">○</span><span class="text">{step.text}</span>{#if step.url}<button class="evidence" onclick={() => Betty.OpenURL(step.url)} title={step.quote}>근거</button>{/if}</li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
+
+  <section class="block" aria-label="연결">
+    <h4>연결</h4>
+    {#each githubItems as i (i.repo_id + i.number)}
+      {@const [label, tone] = stageLabel(i)}
+      <button class="link" onclick={() => Betty.OpenURL(i.url)} title={i.title}>
+        <span class="kind">{i.kind === 'pr' ? 'PR' : '이슈'} #{i.number}</span><span class="name">{i.title}</span><span class="stage {tone}">{label}</span>
+      </button>
+    {/each}
+    {#each designs as d (d.url)}
+      <button class="link" onclick={() => Betty.OpenURL(d.url)} title={d.reason}><span class="kind">피그마</span><span class="name">{d.label}</span></button>
+    {/each}
+    {#if ticket.source_url}<button class="link" onclick={() => Betty.OpenURL(ticket.source_url)}><span class="kind">디스코드</span><span class="name">원문 대화</span></button>{/if}
+    {#if !githubItems.length && !designs.length && !ticket.source_url}<p class="note">연결된 PR·피그마·대화가 없어요.</p>{/if}
+    <button class="link quiet" onclick={() => Betty.OpenBoard()}><span class="name">웹 보드에서 보기 ↗</span></button>
+  </section>
+
+  <section class="block" aria-label="자동 정리 기록">
+    <h4>자동 정리 기록</h4>
+    {#if changes === null}
+      <p class="note">불러오는 중…</p>
+    {:else if !changes.length}
+      <p class="note">베티가 자동으로 바꾼 적이 없어요.</p>
+    {:else}
+      <ul class="changes">
+        {#each changes as c (c.id)}
+          <li class:undone={c.undone_at}>
+            <span class="when">{fmt(c.created_at)} · {changeLabel[c.kind] ?? c.kind}{c.undone_at ? ' · 되돌림' : ''}</span>
+            <span class="why">{c.reason}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
   <p class="stamp">{#if ticket.created_at}만든 날 {fmt(ticket.created_at)} · {/if}마지막 변경 {fmt(ticket.updated_at)}{#if saving} · 저장 중…{/if}</p>
 </section>
 
 <style>
   .detail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; padding: 46px 16px 14px; border-left: 0.5px solid var(--line); overflow-y: auto; }
+  .detail > * { flex-shrink: 0; } /* the pane scrolls; nothing squeezes */
   header { display: flex; align-items: center; justify-content: space-between; }
   .num { font-size: 12px; font-weight: 700; color: var(--fg3); font-variant-numeric: tabular-nums; }
   .close { width: 22px; height: 22px; border-radius: 6px; color: var(--fg3); }
@@ -165,9 +229,30 @@
   .due.overdue, .due.today { color: var(--red); }
   .due.soon { color: var(--orange); }
   .desc-label { font-size: 12px; color: var(--fg3); }
-  .desc { min-height: 140px; flex: 1; resize: none; padding: 8px 10px; font-size: 12.5px; line-height: 1.55; user-select: text; -webkit-user-select: text; }
-  .links { display: flex; flex-wrap: wrap; gap: 6px; }
-  .links button { padding: 4px 10px; border-radius: 6px; background: var(--fill); font-size: 12px; font-weight: 600; }
-  .links button:hover { background: var(--fill-hover); }
+  .desc { min-height: 120px; flex: none; resize: vertical; padding: 8px 10px; font-size: 12.5px; line-height: 1.55; user-select: text; -webkit-user-select: text; }
+  .block { display: flex; flex-direction: column; gap: 4px; }
+  h4 { margin: 4px 0 2px; font-size: 12px; font-weight: 600; color: var(--fg3); }
+  .note { margin: 0; font-size: 12px; color: var(--fg3); }
+  .steps, .changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .steps li { display: flex; align-items: baseline; gap: 6px; font-size: 12.5px; line-height: 1.45; user-select: text; -webkit-user-select: text; }
+  .mark { flex: none; width: 14px; color: var(--fg3); }
+  .ok .mark { color: var(--green); }
+  .ok .text { color: var(--fg2); }
+  .text { flex: 1; min-width: 0; }
+  .evidence { flex: none; font-size: 11px; color: var(--accent); }
+  .link { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 8px; border-radius: 7px; background: var(--fill); text-align: left; font-size: 12px; }
+  .link:hover { background: var(--fill-hover); }
+  .link.quiet { background: none; color: var(--fg3); }
+  .kind { flex: none; font-weight: 700; color: var(--fg2); }
+  .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stage { flex: none; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 700; background: var(--card-solid, rgba(255,255,255,0.6)); }
+  .stage.merged { color: #8250df; }
+  .stage.open { color: var(--green); }
+  .stage.review { color: var(--orange); }
+  .stage.closed, .stage.draft { color: var(--fg3); }
+  .changes li { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border-radius: 7px; background: var(--fill); }
+  .changes li.undone { opacity: 0.6; }
+  .when { font-size: 11px; font-weight: 600; color: var(--fg3); }
+  .why { font-size: 12px; line-height: 1.45; color: var(--fg2); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; user-select: text; -webkit-user-select: text; }
   .stamp { margin: 0; font-size: 11px; color: var(--fg3); }
 </style>

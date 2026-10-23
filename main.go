@@ -167,6 +167,7 @@ func main() {
 	fileMenu := menu.AddSubmenu("파일")
 	fileMenu.Add("새 할 일").SetAccelerator("CmdOrCtrl+N").OnClick(func(*application.Context) { command("new-task") })
 	fileMenu.Add("빠른 추가").SetAccelerator(quickAddShortcut).OnClick(func(*application.Context) { openQuick() })
+	fileMenu.Add("대화로 할 일 만들기…").SetAccelerator("CmdOrCtrl+Shift+N").OnClick(func(*application.Context) { command("capture") })
 	fileMenu.AddSeparator()
 	fileMenu.Add("새로고침").SetAccelerator("CmdOrCtrl+R").OnClick(func(*application.Context) { go betty.Refresh() })
 	fileMenu.Add("웹 보드 열기").SetAccelerator("CmdOrCtrl+Shift+B").OnClick(func(*application.Context) { _ = betty.OpenBoard() })
@@ -198,6 +199,7 @@ func main() {
 		{"자동 정리 기록", "CmdOrCtrl+6", "go-history"},
 		{"개발 현황", "CmdOrCtrl+7", "go-github"},
 		{"팀·연결 설정", "CmdOrCtrl+8", "go-admin"},
+		{"보드", "CmdOrCtrl+9", "go-board"},
 	} {
 		cmd := v.cmd
 		viewMenu.Add(v.label).SetAccelerator(v.key).OnClick(func(*application.Context) { command(cmd) })

@@ -2,9 +2,9 @@
   // 개발 현황: issues and PRs from the connected repositories, which task each belongs to,
   // and the assistant's "same work?" suggestions to confirm or reject.
   import { Betty } from '../../bindings/github.com/wondde/betty'
-  import type { GitHubItem } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
   import { nav } from '../lib/nav.svelte'
+  import { stageLabel } from '../lib/tasks'
 
   let { onerror, onsaved }: { onerror: (m: string) => void; onsaved: (m: string) => void } = $props()
 
@@ -26,12 +26,6 @@
     return v.members?.find((m) => m.id === id)?.name ?? login
   }
   const ticket = (id: string) => v.tickets?.find((t) => t.id === id)
-  const stageLabel = (i: GitHubItem): [string, string] => {
-    if (i.kind === 'pr' && i.stage === 'merged') return ['병합됨', 'merged']
-    if (i.kind === 'pr' && i.stage === 'closed') return ['병합 없이 닫힘', 'closed']
-    if (i.kind === 'issue' && i.state === 'closed') return i.state_reason === 'completed' ? ['완료됨', 'merged'] : ['하지 않기로 함', 'closed']
-    return ({ draft: ['준비 중', 'draft'], review_requested: ['리뷰 요청', 'review'] } as Record<string, [string, string]>)[i.stage] ?? ['진행 중', 'open']
-  }
 
   const items = $derived.by(() => {
     const q = query.trim().toLowerCase()

@@ -47,6 +47,15 @@ export interface CreateInput {
     "due_date"?: string;
 }
 
+/**
+ * DesignLink is a Figma screen or comment the design review tied to a task.
+ */
+export interface DesignLink {
+    "url": string;
+    "label": string;
+    "reason": string;
+}
+
 export interface DesignQuestion {
     "id": string;
     "question": string;
@@ -217,6 +226,12 @@ export interface MemberInput {
     "github_login": string;
 }
 
+export interface ProgressStep {
+    "text": string;
+    "quote": string;
+    "url": string;
+}
+
 export interface Project {
     "id": string;
     "name": string;
@@ -261,6 +276,15 @@ export interface ProposalPayload {
 export interface Routing {
     "confirmed": boolean | null;
     "reason": string;
+}
+
+/**
+ * TaskProgress is what the automations confirmed finished and still open for a task.
+ */
+export interface TaskProgress {
+    "finished": ProgressStep[] | null;
+    "remaining": ProgressStep[] | null;
+    "updated_at": string;
 }
 
 export interface Ticket {

@@ -21,6 +21,7 @@
     return (v.meetings ?? []).filter((m) => m.status !== 'cancelled' && m.date >= today && m.date <= week).length
   })
   const views = $derived([
+    { scope: { kind: 'board' } as Scope, icon: '▥', label: '보드', count: 0 },
     { scope: { kind: 'calendar' } as Scope, icon: '▦', label: '캘린더', count: soonMeetings },
     { scope: { kind: 'teamStatus' } as Scope, icon: '▤', label: '팀 현황', count: 0 },
     { scope: { kind: 'history' } as Scope, icon: '↺', label: '자동 정리 기록', count: 0 },

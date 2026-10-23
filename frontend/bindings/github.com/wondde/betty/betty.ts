@@ -58,6 +58,13 @@ export function CancelSignIn(): $CancellablePromise<void> {
 }
 
 /**
+ * Capture sends a pasted conversation to the extractor for this project.
+ */
+export function Capture(content: string, projectID: string): $CancellablePromise<void> {
+    return $Call.ByID(1853514886, content, projectID);
+}
+
+/**
  * Claim makes a task mine ("내가 할게").
  */
 export function Claim(id: string): $CancellablePromise<berry$0.Ticket> {
@@ -198,6 +205,13 @@ export function SignIn(): $CancellablePromise<void> {
  */
 export function SignOut(): $CancellablePromise<void> {
     return $Call.ByID(3861533215);
+}
+
+/**
+ * TaskHistory lists the automatic changes made to one task, newest first.
+ */
+export function TaskHistory(ticketID: string): $CancellablePromise<berry$0.Change[] | null> {
+    return $Call.ByID(2019713571, ticketID);
 }
 
 /**

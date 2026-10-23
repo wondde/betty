@@ -24,6 +24,8 @@
   import SignIn from './SignIn.svelte'
   import Onboarding from './Onboarding.svelte'
   import Sheet from './Sheet.svelte'
+  import Board from './Board.svelte'
+  import CaptureSheet from './CaptureSheet.svelte'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
   let refreshing = $state(false)
@@ -32,6 +34,7 @@
   let search = $state<HTMLInputElement>()
   let tour = $state(false)
   let sheet = $state<'settings' | 'shortcuts' | 'about' | null>(null)
+  let capturing = $state(false)
 
   // App menu commands (파일 · 편집 · 보기 · 도움말 …) arrive from Go as "betty:command".
   onMount(() =>
@@ -41,13 +44,16 @@
         sheet = null
         if (!isTaskList(nav.scope)) go({ kind: 'mine' })
         queueMicrotask(() => composer?.focus())
+      } else if (name === 'capture') {
+        sheet = null
+        capturing = true
       } else if (name === 'search') {
         sheet = null
         search?.focus()
         search?.select()
       } else if (name.startsWith('go-')) {
         sheet = null
-        const kind = name.slice(3) as 'mine' | 'team' | 'inbox' | 'calendar' | 'teamStatus' | 'history' | 'github' | 'admin'
+        const kind = name.slice(3) as 'mine' | 'team' | 'board' | 'inbox' | 'calendar' | 'teamStatus' | 'history' | 'github' | 'admin'
         go({ kind })
       } else if (name === 'toggle-done') nav.showDone = !nav.showDone
       else if (name === 'onboarding') {
@@ -66,6 +72,7 @@
     const s = nav.scope
     if (s.kind === 'mine') return '내 할 일'
     if (s.kind === 'team') return '팀 전체'
+    if (s.kind === 'board') return '보드'
     if (s.kind === 'unassigned') return '담당자 없음'
     if (s.kind === 'inbox') return '확인해 주세요'
     if (s.kind === 'calendar') return '캘린더'
@@ -108,6 +115,8 @@
     return out
   })
   const flat = $derived(groups.flatMap((g) => g.items))
+  // The board shows every status itself (done is limited to recent work inside the board).
+  const boardTickets = $derived(all.filter((t) => matches(t, nav.query, v.members ?? [])))
   const selected = $derived(all.find((t) => t.id === nav.selected) ?? null)
 
   const summary = $derived.by(() => {
@@ -119,6 +128,7 @@
   const subtitle = $derived.by(() => {
     switch (nav.scope.kind) {
       case 'inbox': return '대화에서 찾은 일이에요. 맞으면 넣어 주세요.'
+      case 'board': return `${summary} · 카드를 끌어 상태를 바꿔요`
       case 'calendar': return '팀 회의 일정 · 한국·일본 시간'
       case 'teamStatus': return '누가 얼마나 맡고 있는지 · 이름을 누르면 그 사람 목록'
       case 'history': return '봇이 스스로 연결하거나 진행·완료 처리한 기록 · 틀리면 되돌리세요'
@@ -162,7 +172,7 @@
       if (typing) target.blur()
       return
     }
-    if (typing || sheet || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
+    if (typing || sheet || capturing || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
     e.preventDefault()
     const i = flat.findIndex((t) => t.id === nav.selected)
     const next = e.key === 'ArrowDown' ? Math.min(flat.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1)
@@ -194,6 +204,7 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
               <input bind:this={search} bind:value={nav.query} placeholder="검색 (⌘F)" aria-label="업무 검색" spellcheck="false" />
             </label>
+            {#if nav.scope.kind === 'board'}<button class="toggle" onclick={() => (capturing = true)} title="대화로 할 일 만들기 (⇧⌘N)">대화 붙여넣기</button>{/if}
             <button class="toggle" class:on={nav.showDone} onclick={() => (nav.showDone = !nav.showDone)} title="완료한 일 보기 (⇧⌘D)">완료 포함</button>
           {/if}
           <button class="icon" onclick={refresh} class:spin={refreshing} title={synced ? `새로고침 (⌘R) · ${synced} 동기화` : '새로고침 (⌘R)'} aria-label="새로고침">
@@ -205,6 +216,7 @@
 
       <section class="list">
         {#if nav.scope.kind === 'inbox'}
+          <div class="inbox-tools"><button onclick={() => (capturing = true)}>＋ 대화 붙여 넣어 할 일 찾기 <span>⇧⌘N</span></button></div>
           <Inbox onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'calendar'}
           <Calendar onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
@@ -216,6 +228,8 @@
           <GitHubView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'admin'}
           <AdminView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'board'}
+          <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
           {#each groups as g (g.title)}
             <h2>{g.title} <span>{g.items.length}</span></h2>
@@ -253,6 +267,7 @@
       <TaskDetail ticket={selected} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
     {/if}
   </div>
+  {#if capturing}<CaptureSheet onclose={() => (capturing = false)} onsent={(m) => say(m, true)} />{/if}
   {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
 {/if}
 
@@ -288,5 +303,9 @@
   footer { position: relative; padding: 8px 14px 12px; border-top: 0.5px solid var(--line); }
   .toast { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 6px); margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(30, 30, 32, 0.92); color: #fff; font-size: 12px; font-weight: 500; z-index: 4; }
   .toast.inline { position: static; }
+  .inbox-tools { padding: 2px 8px 6px; }
+  .inbox-tools button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 9px; border: 1px dashed var(--line); color: var(--fg2); font-size: 12.5px; font-weight: 600; }
+  .inbox-tools button:hover { background: var(--fill); color: var(--fg); }
+  .inbox-tools span { font-weight: 500; color: var(--fg3); font-size: 11px; }
   .toast.ok { background: color-mix(in srgb, var(--green) 85%, black); }
 </style>

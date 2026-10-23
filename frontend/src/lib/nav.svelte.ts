@@ -2,6 +2,7 @@
 export type Scope =
   | { kind: 'mine' }
   | { kind: 'team' }
+  | { kind: 'board' }
   | { kind: 'unassigned' }
   | { kind: 'inbox' }
   | { kind: 'calendar' }

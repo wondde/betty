@@ -6,6 +6,7 @@ export type {
     ChangeLink,
     ChangeTicket,
     CreateInput,
+    DesignLink,
     DesignQuestion,
     DiscordChannel,
     Evidence,
@@ -21,10 +22,12 @@ export type {
     MeetingProposal,
     Member,
     MemberInput,
+    ProgressStep,
     Project,
     ProjectChannel,
     Proposal,
     ProposalPayload,
     Routing,
+    TaskProgress,
     Ticket
 } from "./models.js";

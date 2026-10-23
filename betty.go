@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.5.0"
+const version = "0.6.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -35,22 +35,24 @@ type View struct {
 	Members   []berry.Member  `json:"members"`
 	Projects  []berry.Project `json:"projects"`
 	// The review inbox ("확인해 주세요")
-	Proposals        []berry.Proposal        `json:"proposals"`
-	MeetingProposals []berry.MeetingProposal `json:"meetingProposals"`
-	DesignQuestions  []berry.DesignQuestion  `json:"designQuestions"`
-	Meetings         []berry.Meeting         `json:"meetings"`
-	GitHub           berry.GitHub            `json:"github"`
-	Settings         map[string]bool         `json:"settings"`
-	DiscordChannels  []berry.DiscordChannel  `json:"discordChannels"`
-	ProjectChannels  []berry.ProjectChannel  `json:"projectChannels"`
-	New              []string                `json:"new"` // my open tasks not looked at yet
-	Order            []string                `json:"order"`
-	HintDone         bool                    `json:"hintDone"`
-	Onboarded        bool                    `json:"onboarded"`
-	Version          string                  `json:"version"`
-	Offline          bool                    `json:"offline"`
-	SyncedAt         string                  `json:"syncedAt"`
-	Server           string                  `json:"server"`
+	Proposals        []berry.Proposal              `json:"proposals"`
+	MeetingProposals []berry.MeetingProposal       `json:"meetingProposals"`
+	DesignQuestions  []berry.DesignQuestion        `json:"designQuestions"`
+	Meetings         []berry.Meeting               `json:"meetings"`
+	GitHub           berry.GitHub                  `json:"github"`
+	Settings         map[string]bool               `json:"settings"`
+	DiscordChannels  []berry.DiscordChannel        `json:"discordChannels"`
+	ProjectChannels  []berry.ProjectChannel        `json:"projectChannels"`
+	Progress         map[string]berry.TaskProgress `json:"progress"`
+	DesignLinks      map[string][]berry.DesignLink `json:"designLinks"`
+	New              []string                      `json:"new"` // my open tasks not looked at yet
+	Order            []string                      `json:"order"`
+	HintDone         bool                          `json:"hintDone"`
+	Onboarded        bool                          `json:"onboarded"`
+	Version          string                        `json:"version"`
+	Offline          bool                          `json:"offline"`
+	SyncedAt         string                        `json:"syncedAt"`
+	Server           string                        `json:"server"`
 }
 
 // Betty is the one service the frontend talks to. Network, Keychain, notifications and
@@ -100,6 +102,7 @@ func (b *Betty) View() View {
 		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
 		v.Meetings = s.Calendar.Meetings
 		v.GitHub, v.Settings, v.DiscordChannels, v.ProjectChannels = s.GitHub, s.Settings, s.DiscordChannels, s.ProjectChannels
+		v.Progress, v.DesignLinks = s.Progress, s.DesignLinks
 		seen := toSet(d.Seen)
 		for _, t := range mine(s) {
 			if !seen[t.ID] {
@@ -398,11 +401,37 @@ func (b *Betty) SaveMeeting(id string, in berry.MeetingInput) error {
 func (b *Betty) History(cursor, status string) (berry.History, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	h, err := b.client.History(ctx, cursor, status)
+	h, err := b.client.History(ctx, cursor, status, "")
 	if err != nil {
 		return berry.History{}, b.handle(err)
 	}
 	return h, nil
+}
+
+// TaskHistory lists the automatic changes made to one task, newest first.
+func (b *Betty) TaskHistory(ticketID string) ([]berry.Change, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	h, err := b.client.History(ctx, "", "all", ticketID)
+	if err != nil {
+		return nil, b.handle(err)
+	}
+	if h.Items == nil {
+		h.Items = []berry.Change{}
+	}
+	return h.Items, nil
+}
+
+// Capture sends a pasted conversation to the extractor for this project.
+func (b *Betty) Capture(content, projectID string) error {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return errors.New("붙여 넣은 대화가 없어요")
+	}
+	if len([]rune(content)) > 40000 {
+		return errors.New("대화가 너무 길어요. 4만 자 안으로 나눠 주세요")
+	}
+	return b.inbox(func(ctx context.Context) error { return b.client.Capture(ctx, content, projectID) })
 }
 
 // Undo reverts one automatic change and reloads the board.
@@ -436,7 +465,9 @@ func (b *Betty) RejectGitHub(ticketID, repoID string, number int) error {
 	if !ok {
 		return errors.New("업무를 찾지 못했어요. 새로고침해 주세요")
 	}
-	return b.inbox(func(ctx context.Context) error { return b.client.GitHubReject(ctx, ticketID, t.UpdatedAt, repoID, number) })
+	return b.inbox(func(ctx context.Context) error {
+		return b.client.GitHubReject(ctx, ticketID, t.UpdatedAt, repoID, number)
+	})
 }
 
 func (b *Betty) AddRepo(fullName, projectID string) error {

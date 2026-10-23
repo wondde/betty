@@ -9,18 +9,40 @@ import (
 // Board is the subset of the BerryTicket board (/api/state) the app uses:
 // every task, the review inbox, people and projects.
 type Board struct {
-	User            BoardUser        `json:"user"`
-	Tickets         []BoardTicket    `json:"tickets"`
-	Members         []Member         `json:"members"`
-	Projects        []Project        `json:"projects"`
-	Proposals       []Proposal       `json:"proposals"`
-	Calendar        Calendar         `json:"calendar"`
-	DesignReview    DesignReview     `json:"design_review"`
-	GitHub          GitHub           `json:"github"`
-	Settings        map[string]bool  `json:"settings"`
-	DiscordChannels []DiscordChannel `json:"discord_channels"`
-	ProjectChannels []ProjectChannel `json:"project_channels"`
-	Revision        string           `json:"revision"`
+	User            BoardUser               `json:"user"`
+	Tickets         []BoardTicket           `json:"tickets"`
+	Members         []Member                `json:"members"`
+	Projects        []Project               `json:"projects"`
+	Proposals       []Proposal              `json:"proposals"`
+	Calendar        Calendar                `json:"calendar"`
+	DesignReview    DesignReview            `json:"design_review"`
+	GitHub          GitHub                  `json:"github"`
+	Settings        map[string]bool         `json:"settings"`
+	DiscordChannels []DiscordChannel        `json:"discord_channels"`
+	ProjectChannels []ProjectChannel        `json:"project_channels"`
+	Progress        map[string]TaskProgress `json:"progress"`     // by ticket id
+	DesignLinks     map[string][]DesignLink `json:"design_links"` // by ticket id
+	Revision        string                  `json:"revision"`
+}
+
+// TaskProgress is what the automations confirmed finished and still open for a task.
+type TaskProgress struct {
+	Finished  []ProgressStep `json:"finished"`
+	Remaining []ProgressStep `json:"remaining"`
+	UpdatedAt string         `json:"updated_at"`
+}
+
+type ProgressStep struct {
+	Text  string `json:"text"`
+	Quote string `json:"quote"`
+	URL   string `json:"url"`
+}
+
+// DesignLink is a Figma screen or comment the design review tied to a task.
+type DesignLink struct {
+	URL    string `json:"url"`
+	Label  string `json:"label"`
+	Reason string `json:"reason"`
 }
 
 type BoardUser struct {
@@ -264,8 +286,11 @@ func (c *Client) SaveMeeting(ctx context.Context, id string, in MeetingInput) er
 }
 
 // History lists automatic changes, newest first; cursor continues from the previous page.
-func (c *Client) History(ctx context.Context, cursor, status string) (History, error) {
+func (c *Client) History(ctx context.Context, cursor, status, ticketID string) (History, error) {
 	q := url.Values{"limit": {"30"}}
+	if ticketID != "" {
+		q.Set("ticket_id", ticketID)
+	}
 	if cursor != "" {
 		q.Set("cursor", cursor)
 	}
@@ -275,6 +300,12 @@ func (c *Client) History(ctx context.Context, cursor, status string) (History, e
 	var h History
 	err := c.do(ctx, http.MethodGet, "/api/automation/history?"+q.Encode(), nil, true, &h)
 	return h, err
+}
+
+// Capture hands a pasted conversation to the extractor; what it finds shows up
+// in the review inbox (or is applied directly when automatic tasks are on).
+func (c *Client) Capture(ctx context.Context, content, projectID string) error {
+	return c.do(ctx, http.MethodPost, "/api/sources", map[string]any{"content": content, "project_id": projectID}, true, nil)
 }
 
 func (c *Client) Undo(ctx context.Context, id string) error {

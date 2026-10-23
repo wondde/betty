@@ -32,6 +32,8 @@ export interface View {
     "settings": { [_ in string]?: boolean } | null;
     "discordChannels": berry$0.DiscordChannel[] | null;
     "projectChannels": berry$0.ProjectChannel[] | null;
+    "progress": { [_ in string]?: berry$0.TaskProgress } | null;
+    "designLinks": { [_ in string]?: berry$0.DesignLink[] | null } | null;
 
     /**
      * my open tasks not looked at yet
