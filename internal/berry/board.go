@@ -494,6 +494,7 @@ type MemberInput struct {
 	DiscordID   string `json:"discord_id"`
 	ChannelID   string `json:"channel_id"`
 	GitHubLogin string `json:"github_login"`
+	Area        string `json:"area"`
 }
 
 func (c *Client) SaveMember(ctx context.Context, id string, in MemberInput) error {

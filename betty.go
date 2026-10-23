@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.7.0"
+const version = "0.8.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -34,7 +34,7 @@ type View struct {
 	Tickets   []berry.Ticket  `json:"tickets"` // every task on the board; mine have assignee_id == member.id
 	Members   []berry.Member  `json:"members"`
 	Projects  []berry.Project `json:"projects"`
-	// The review inbox ("확인해 주세요")
+	// The review inbox ("베티가 찾은 일")
 	Proposals        []berry.Proposal              `json:"proposals"`
 	MeetingProposals []berry.MeetingProposal       `json:"meetingProposals"`
 	DesignQuestions  []berry.DesignQuestion        `json:"designQuestions"`

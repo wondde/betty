@@ -1,5 +1,5 @@
 <script lang="ts">
-  // "확인해 주세요": tasks and meetings the assistant found in conversations, and design
+  // "베티가 찾은 일": tasks and meetings the assistant found in conversations, and design
   // questions. Grouped by project (undecided first, since those need a choice), cards stay
   // short until opened, a change proposal shows exactly what it would change, and several
   // proposals for the same task collapse into the newest one.

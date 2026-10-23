@@ -2,16 +2,16 @@
   import { ask, asking } from '../lib/ask.svelte'
   import AskDialog from './AskDialog.svelte'
   // Main window, Mac three-pane layout:
-  //   sidebar (my tasks · team · unassigned · review inbox · projects · people)
-  //   | list for that scope, with search (⌘F) and an add field
-  //   | detail pane for the selected task.
+  //   sidebar (내 할 일 · 팀 할 일 · 베티가 찾은 일 · 캘린더 · projects · team by area)
+  //   | list (or board) for that place, with search (⌘F) and an add field
+  //   | detail pane for the selected task. Settings (⌘,) cover the window.
   import { onMount } from 'svelte'
   import { Events } from '@wailsio/runtime'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { BettyCommand } from '../../bindings/events'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
-  import { nav, go, isTaskList, byProject } from '../lib/nav.svelte'
+  import { nav, go, isTaskList, byProject, areaName, memberArea } from '../lib/nav.svelte'
   import { daysUntil, groupByProject, groupByStatus, matches, sortTasks, statusLabel, todayLabel, type Group } from '../lib/tasks'
   import ProjectChips from './ProjectChips.svelte'
   import Sidebar from './Sidebar.svelte'
@@ -19,17 +19,13 @@
   import TaskDetail from './TaskDetail.svelte'
   import Inbox from './Inbox.svelte'
   import Calendar from './Calendar.svelte'
-  import History from './History.svelte'
-  import TeamStatus from './TeamStatus.svelte'
-  import GitHubView from './GitHubView.svelte'
-  import AdminView from './AdminView.svelte'
   import Composer from './Composer.svelte'
   import SignIn from './SignIn.svelte'
   import Onboarding from './Onboarding.svelte'
   import Sheet from './Sheet.svelte'
   import Board from './Board.svelte'
   import CaptureSheet from './CaptureSheet.svelte'
-  import TrashView from './TrashView.svelte'
+  import SettingsView from './SettingsView.svelte'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
   let refreshing = $state(false)
@@ -37,7 +33,9 @@
   let composer = $state<Composer>()
   let search = $state<HTMLInputElement>()
   let tour = $state(false)
-  let sheet = $state<'settings' | 'shortcuts' | 'about' | null>(null)
+  let sheet = $state<'shortcuts' | 'about' | null>(null)
+  let settings = $state<string | null>(null) // open tab, or null when closed
+  const openSettings = (tab = 'general') => ((sheet = null), (settings = tab))
   let capturing = $state(false)
 
   // App menu commands (파일 · 편집 · 보기 · 도움말 …) arrive from Go as "betty:command".
@@ -57,13 +55,18 @@
         search?.select()
       } else if (name.startsWith('go-')) {
         sheet = null
-        const kind = name.slice(3) as 'mine' | 'team' | 'board' | 'inbox' | 'calendar' | 'teamStatus' | 'history' | 'github' | 'admin'
+        settings = null
+        const kind = name.slice(3) as 'mine' | 'team' | 'inbox' | 'calendar'
         go({ kind })
+      } else if (name === 'toggle-board') {
+        if (nav.scope.kind !== 'team') go({ kind: 'team' })
+        nav.board = !nav.board
       } else if (name === 'toggle-done') nav.showDone = !nav.showDone
       else if (name === 'onboarding') {
         sheet = null
         tour = true
-      } else if (name === 'settings' || name === 'shortcuts' || name === 'about') sheet = name
+      } else if (name === 'settings') openSettings()
+      else if (name === 'shortcuts' || name === 'about') sheet = name
     }),
   )
 
@@ -75,26 +78,25 @@
   const scopeTitle = $derived.by(() => {
     const s = nav.scope
     if (s.kind === 'mine') return '내 할 일'
-    if (s.kind === 'team') return '팀 전체'
-    if (s.kind === 'board') return '보드'
-    if (s.kind === 'unassigned') return '담당자 없음'
-    if (s.kind === 'inbox') return '확인해 주세요'
+    if (s.kind === 'team') return '팀 할 일'
+    if (s.kind === 'inbox') return '베티가 찾은 일'
     if (s.kind === 'calendar') return '캘린더'
-    if (s.kind === 'teamStatus') return '팀 현황'
-    if (s.kind === 'history') return '자동 정리 기록'
-    if (s.kind === 'github') return '개발 현황'
-    if (s.kind === 'admin') return '팀·연결 설정'
-    if (s.kind === 'trash') return '휴지통'
+    if (s.kind === 'area') return `${areaName[s.id]} 팀`
     if (s.kind === 'project') return v.projects?.find((p) => p.id === s.id)?.name ?? '프로젝트'
     return v.members?.find((m) => m.id === s.id)?.name ?? '팀원'
   })
+
+  const areaMembers = $derived(new Set(nav.scope.kind === 'area' ? (v.members ?? []).filter((m) => memberArea(m) === (nav.scope as { id: string }).id).map((m) => m.id) : []))
+  const boardMode = $derived(nav.scope.kind === 'team' && nav.board)
+  const unassignedCount = $derived(all.filter((t) => t.status !== 'done' && !t.assignee_id).length)
 
   // The scope before the project chip narrows it (the chips count from this).
   const scoped = $derived.by(() => {
     const s = nav.scope
     return all.filter((t) => {
       if (s.kind === 'mine') return t.assignee_id === me
-      if (s.kind === 'unassigned') return !t.assignee_id
+      if (s.kind === 'team' && nav.unassigned) return !t.assignee_id
+      if (s.kind === 'area') return !!t.assignee_id && areaMembers.has(t.assignee_id)
       if (s.kind === 'project') return t.project?.id === s.id
       if (s.kind === 'member') return t.assignee_id === s.id
       return true
@@ -102,7 +104,7 @@
   })
   const inScope = $derived(byProject(nav.scope) && nav.project ? scoped.filter((t) => t.project?.id === nav.project) : scoped)
   // Team-wide lists without a chosen project are sectioned by project.
-  const projectSections = $derived(byProject(nav.scope) && !nav.project && nav.scope.kind !== 'board')
+  const projectSections = $derived(byProject(nav.scope) && !nav.project && nav.scope.kind !== 'area' && !boardMode)
   let collapsed = $state(new Set<string>())
   const toggleGroup = (key: string) => (collapsed = collapsed.has(key) ? new Set([...collapsed].filter((k) => k !== key)) : new Set([...collapsed, key]))
   const searching = $derived(nav.query.trim().length > 0)
@@ -112,6 +114,7 @@
 
   // My list keeps the urgency order; other lists group by status.
   const groups = $derived.by((): Group[] => {
+    if (nav.scope.kind === 'area') return groupByMember(visible)
     if (projectSections) return groupByProject(visible, v.projects ?? [])
     if (nav.scope.kind !== 'mine') return groupByStatus(visible).map((g) => ({ ...g, key: g.title }))
     const open = sortTasks(visible.filter((t) => t.status !== 'done'), isNew, v.order ?? [])
@@ -126,13 +129,21 @@
     if (done.length) out.push({ key: '완료', title: '완료', items: done })
     return out
   })
+  // An area lists each person's work under their name, busiest first.
+  function groupByMember(tickets: Ticket[]): Group[] {
+    const by = new Map<string, Ticket[]>()
+    for (const t of groupByStatus(tickets).flatMap((g) => g.items)) by.has(t.assignee_id!) ? by.get(t.assignee_id!)!.push(t) : by.set(t.assignee_id!, [t])
+    return [...by.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([id, items]) => ({ key: id, title: v.members?.find((m) => m.id === id)?.name ?? '팀원', items }))
+  }
   const flat = $derived(groups.filter((g) => !collapsed.has(g.key)).flatMap((g) => g.items))
   const showProjectChip = $derived(nav.scope.kind !== 'project' && !nav.project && !projectSections)
   // The board shows every status itself (done is limited to recent work inside the board).
   const boardTickets = $derived(inScope.filter((t) => matches(t, nav.query, v.members ?? [])))
   // The board is per project: arriving without one picks the busiest.
   $effect(() => {
-    if (nav.scope.kind !== 'board' || nav.project) return
+    if (!boardMode || nav.project) return
     const n = new Map<string, number>()
     for (const t of scoped) if (t.status !== 'done' && t.project) n.set(t.project.id, (n.get(t.project.id) ?? 0) + 1)
     const busiest = [...n.entries()].sort((a, b) => b[1] - a[1])[0]
@@ -148,14 +159,10 @@
   })
   const subtitle = $derived.by(() => {
     switch (nav.scope.kind) {
-      case 'inbox': return '대화에서 찾은 일이에요. 맞으면 넣어 주세요.'
-      case 'board': return `${summary} · 카드를 끌어 상태를 바꿔요`
+      case 'inbox': return '베티가 디스코드 대화에서 찾은 할 일 후보예요. 맞으면 넣고, 아니면 넘기세요.'
       case 'calendar': return '팀 회의 일정 · 한국·일본 시간'
-      case 'teamStatus': return '누가 얼마나 맡고 있는지 · 이름을 누르면 그 사람 목록'
-      case 'history': return '봇이 스스로 연결하거나 진행·완료 처리한 기록 · 틀리면 되돌리세요'
-      case 'github': return '연결된 저장소의 이슈와 PR · 어떤 업무인지 연결해 두면 진행이 자동으로 반영돼요'
-      case 'admin': return '자동화, 프로젝트와 채널, 팀원, GitHub 저장소'
-      case 'trash': return '지운 업무 · 베티가 같은 일을 다시 만들지 않아요'
+      case 'team': return boardMode ? `${summary} · 카드를 끌어 상태를 바꿔요` : nav.unassigned ? `아직 아무도 맡지 않은 일 · ${summary}` : summary
+      case 'area': return `${summary} · 사람별로 묶었어요`
       case 'mine': return `${todayLabel()} · ${summary}`
       default: return summary
     }
@@ -230,7 +237,7 @@
   <Onboarding ondone={() => (tour = false)} />
 {:else}
   <div class="layout">
-    <Sidebar onsettings={() => (sheet = 'settings')} />
+    <Sidebar onsettings={(tab) => openSettings(tab)} />
 
     <main>
       <header>
@@ -244,7 +251,12 @@
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
               <input bind:this={search} bind:value={nav.query} placeholder="검색 (⌘F)" aria-label="업무 검색" spellcheck="false" />
             </label>
-            {#if nav.scope.kind === 'board'}<button class="toggle" onclick={() => (capturing = true)} title="대화로 할 일 만들기 (⇧⌘N)">대화 붙여넣기</button>{/if}
+            {#if nav.scope.kind === 'team'}
+              <div class="seg" role="radiogroup" aria-label="보기">
+                <button role="radio" aria-checked={!nav.board} class:on={!nav.board} onclick={() => (nav.board = false)}>목록</button>
+                <button role="radio" aria-checked={nav.board} class:on={nav.board} onclick={() => (nav.board = true)} title="보드 (⌘B)">보드</button>
+              </div>
+            {/if}
             <button class="toggle" class:on={nav.showDone} onclick={() => (nav.showDone = !nav.showDone)} title="완료한 일 보기 (⇧⌘D)">완료 포함</button>
           {/if}
           <button class="icon" onclick={refresh} class:spin={refreshing} title={synced ? `새로고침 (⌘R) · ${synced} 동기화` : '새로고침 (⌘R)'} aria-label="새로고침">
@@ -252,7 +264,14 @@
           </button>
         </div>
       </header>
-      {#if byProject(nav.scope)}<ProjectChips tickets={scoped} all={nav.scope.kind !== 'board'} />{/if}
+      {#if byProject(nav.scope)}
+        <div class="filters">
+          {#if nav.scope.kind === 'team'}
+            <button class="who" class:on={nav.unassigned} onclick={() => (nav.unassigned = !nav.unassigned)} title="아직 아무도 맡지 않은 일만 보기">아무도 안 맡은 일 <span>{unassignedCount}</span></button>
+          {/if}
+          <ProjectChips tickets={scoped} all={!boardMode} />
+        </div>
+      {/if}
       {#if v.offline}<p class="offline">오프라인 · 마지막으로 불러온 내용이에요</p>{/if}
 
       <section class="list">
@@ -261,17 +280,7 @@
           <Inbox onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'calendar'}
           <Calendar onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
-        {:else if nav.scope.kind === 'teamStatus'}
-          <TeamStatus />
-        {:else if nav.scope.kind === 'history'}
-          <History onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
-        {:else if nav.scope.kind === 'github'}
-          <GitHubView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
-        {:else if nav.scope.kind === 'admin'}
-          <AdminView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
-        {:else if nav.scope.kind === 'trash'}
-          <TrashView onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
-        {:else if nav.scope.kind === 'board'}
+        {:else if boardMode}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
           {#each groups as g (g.key)}
@@ -283,7 +292,7 @@
             {#if !collapsed.has(g.key)}
               {#each g.items as t (t.id)}
                 <div data-task={t.id}>
-                  <TaskCard ticket={t} isNew={isNew.has(t.id)} selected={nav.selected === t.id} showAssignee={nav.scope.kind !== 'mine' && nav.scope.kind !== 'member'}
+                  <TaskCard ticket={t} isNew={isNew.has(t.id)} selected={nav.selected === t.id} showAssignee={!['mine', 'member', 'area'].includes(nav.scope.kind)}
                     showProject={showProjectChip} showStatus={g.title !== statusLabel[t.status]} onselect={() => select(t)} onerror={(m) => say(m)} />
                 </div>
               {/each}
@@ -319,6 +328,7 @@
   </div>
   <AskDialog />
   {#if capturing}<CaptureSheet onclose={() => (capturing = false)} onsent={(m) => say(m, true)} />{/if}
+  {#if settings}<SettingsView tab={settings} onclose={() => (settings = null)} ontour={() => ((settings = null), (tour = true))} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />{/if}
   {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
 {/if}
 
@@ -364,5 +374,16 @@
   .inbox-tools button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 9px; border: 1px dashed var(--line); color: var(--fg2); font-size: 12.5px; font-weight: 600; }
   .inbox-tools button:hover { background: var(--fill); color: var(--fg); }
   .inbox-tools span { font-weight: 500; color: var(--fg3); font-size: 11px; }
+  .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }
+  .seg button { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--fg2); }
+  .seg button.on { background: var(--card-solid, #fff); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+  @media (prefers-color-scheme: dark) { .seg button.on { --card-solid: #48484a; } }
+  .filters { display: flex; align-items: center; gap: 6px; padding-left: 18px; min-width: 0; }
+  .filters :global(.chips) { padding-left: 0; flex: 1; min-width: 0; }
+  .who { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 26px; margin-bottom: 8px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 600; color: var(--fg2); background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+  .who span { font-weight: 500; color: var(--fg3); }
+  .who.on { background: var(--fg); color: var(--bg-invert, #fff); }
+  @media (prefers-color-scheme: dark) { .who.on { color: #1c1c1e; } }
+  .who.on span { color: inherit; opacity: 0.7; }
   .toast.ok { background: color-mix(in srgb, var(--green) 85%, black); }
 </style>

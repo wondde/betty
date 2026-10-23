@@ -25,6 +25,7 @@
   const done = $derived(ticket.status === 'done')
   const working = $derived(ticket.status === 'in_progress')
   const assignee = $derived(app.view.members?.find((m) => m.id === ticket.assignee_id))
+  const guesses = $derived((app.view.github?.suggestions ?? []).filter((s) => s.ticket_id === ticket.id).length)
   const checklist = $derived.by(() => {
     const p = app.view.progress?.[ticket.id]
     const done = p?.finished?.length ?? 0
@@ -73,6 +74,7 @@
       {#if showStatus && (working || ticket.status === 'blocked')}<span class="status {ticket.status}">{statusLabel[ticket.status]}</span>{/if}
       {#if ticket.priority === 'urgent' || ticket.priority === 'high'}<span class="prio {ticket.priority}">{ticket.priority === 'urgent' ? '긴급' : '중요'}</span>{/if}
       {#if due}<span class="due {due.tone}">{due.label}</span>{/if}
+      {#if guesses}<span class="guess" title="베티가 같은 업무 같다고 본 GitHub 항목이 있어요. 상세에서 확인해 주세요">PR 확인 {guesses}</span>{/if}
       {#if checklist.total}<span class="checks" class:all={checklist.done === checklist.total}>☑ {checklist.done}/{checklist.total}</span>{/if}
     </div>
   </div>
@@ -118,6 +120,7 @@
   .prio.high { color: var(--orange); }
   .due { font-weight: 600; }
   .checks { font-variant-numeric: tabular-nums; }
+  .guess { font-weight: 600; color: var(--orange); }
   .checks.all { color: var(--green); }
   .due.overdue, .due.today { color: var(--red); }
   .due.soon { color: var(--orange); }

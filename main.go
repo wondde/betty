@@ -192,14 +192,10 @@ func main() {
 	viewMenu := menu.AddSubmenu("보기")
 	for _, v := range []struct{ label, key, cmd string }{
 		{"내 할 일", "CmdOrCtrl+1", "go-mine"},
-		{"팀 전체", "CmdOrCtrl+2", "go-team"},
-		{"확인해 주세요", "CmdOrCtrl+3", "go-inbox"},
+		{"팀 할 일", "CmdOrCtrl+2", "go-team"},
+		{"베티가 찾은 일", "CmdOrCtrl+3", "go-inbox"},
 		{"캘린더", "CmdOrCtrl+4", "go-calendar"},
-		{"팀 현황", "CmdOrCtrl+5", "go-teamStatus"},
-		{"자동 정리 기록", "CmdOrCtrl+6", "go-history"},
-		{"개발 현황", "CmdOrCtrl+7", "go-github"},
-		{"팀·연결 설정", "CmdOrCtrl+8", "go-admin"},
-		{"보드", "CmdOrCtrl+9", "go-board"},
+		{"목록/보드 전환", "CmdOrCtrl+B", "toggle-board"},
 	} {
 		cmd := v.cmd
 		viewMenu.Add(v.label).SetAccelerator(v.key).OnClick(func(*application.Context) { command(cmd) })

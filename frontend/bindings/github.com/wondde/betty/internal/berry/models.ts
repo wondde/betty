@@ -234,6 +234,11 @@ export interface Member {
      * personal work channel
      */
     "channel_id"?: string;
+
+    /**
+     * engineering | design | marketing | ""
+     */
+    "area"?: string;
 }
 
 export interface MemberInput {
@@ -241,6 +246,7 @@ export interface MemberInput {
     "discord_id": string;
     "channel_id": string;
     "github_login": string;
+    "area": string;
 }
 
 export interface ProgressStep {

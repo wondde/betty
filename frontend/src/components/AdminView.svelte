@@ -1,18 +1,19 @@
 <script lang="ts">
   import { ask } from '../lib/ask.svelte'
-  // 팀·연결 설정: automation switches, projects and their Discord channels, people (Discord /
+  // Settings tabs (팀원·프로젝트, 자동화, GitHub): automation switches, projects and their Discord channels, people (Discord /
   // work channel / GitHub), and the GitHub repositories the server reads.
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { app, message } from '../lib/view.svelte'
 
-  let { onerror, onsaved }: { onerror: (m: string) => void; onsaved: (m: string) => void } = $props()
+  // Shown as tabs in Settings: 'team' (people and projects), 'automation', 'repos'.
+  let { section, onerror, onsaved }: { section: 'team' | 'automation' | 'repos'; onerror: (m: string) => void; onsaved: (m: string) => void } = $props()
 
   const v = $derived(app.view)
   let busy = $state(false)
 
   // Switches the team decided to keep off (no Discord noise). Turning them on asks first.
   const switches: { key: string; label: string; note: string; guarded?: boolean }[] = [
-    { key: 'auto_tickets_enabled', label: '대화에서 업무 자동 만들기', note: '명확한 할 일은 바로 만들고, 애매한 건 확인해 주세요로 보내요.' },
+    { key: 'auto_tickets_enabled', label: '대화에서 업무 자동 만들기', note: '명확한 할 일은 바로 만들고, 애매한 건 "베티가 찾은 일"로 보내요.' },
     { key: 'design_review_enabled', label: '피그마 변경 자동 검토', note: '디자인 변경을 기존 업무와 대조해요. 디스코드 알림은 보내지 않아요.' },
     { key: 'assignment_notifications_enabled', label: '배정 알림 (디스코드)', note: '새 배정을 공유 채널에 요약해 보내요.', guarded: true },
     { key: 'reminders_enabled', label: '마감 리마인더 (디스코드)', note: '내일 마감인 업무를 하루 한 번 알려요.', guarded: true },
@@ -62,16 +63,22 @@
   }
 
   // ---------- members ----------
-  let editingMember = $state<{ id: string; name: string; discord_id: string; channel_id: string; github_login: string } | null>(null)
+  let editingMember = $state<{ id: string; name: string; discord_id: string; channel_id: string; github_login: string; area: string } | null>(null)
+  const areaOptions = [['', '영역 미정'], ['engineering', '개발'], ['design', '디자인'], ['marketing', '마케팅']]
   const githubOf = (memberId: string) => v.github?.identities?.find((i) => i.member_id === memberId)?.login ?? ''
   function editMember(id = '') {
     const m = v.members?.find((m) => m.id === id)
-    editingMember = { id, name: m?.name ?? '', discord_id: m?.discord_id ?? '', channel_id: m?.channel_id ?? '', github_login: id ? githubOf(id) : '' }
+    editingMember = { id, name: m?.name ?? '', discord_id: m?.discord_id ?? '', channel_id: m?.channel_id ?? '', github_login: id ? githubOf(id) : '', area: m?.area ?? '' }
   }
   async function saveMember() {
     const m = editingMember!
     if (!m.name.trim()) return onerror('이름을 적어 주세요')
-    if (await run(() => Betty.SaveMember(m.id, { name: m.name.trim(), discord_id: m.discord_id.trim(), channel_id: m.channel_id.trim(), github_login: m.github_login.trim() }), m.id ? '팀원 정보를 바꿨어요' : '팀원을 추가했어요')) editingMember = null
+    if (await run(() => Betty.SaveMember(m.id, { name: m.name.trim(), discord_id: m.discord_id.trim(), channel_id: m.channel_id.trim(), github_login: m.github_login.trim(), area: m.area }), m.id ? '팀원 정보를 바꿨어요' : '팀원을 추가했어요')) editingMember = null
+  }
+  // Area can be set right in the list, without opening the editor.
+  function setArea(id: string, area: string) {
+    const m = v.members!.find((x) => x.id === id)!
+    run(() => Betty.SaveMember(id, { name: m.name, discord_id: m.discord_id ?? '', channel_id: m.channel_id ?? '', github_login: githubOf(id), area }), `${m.name}: ${areaOptions.find((o) => o[0] === area)![1]}`)
   }
 
   // ---------- repos ----------
@@ -86,12 +93,30 @@
 </script>
 
 <div class="admin">
+  {#if section === 'automation'}
   <section>
     <h2>자동화</h2>
     {#each switches as sw (sw.key)}
       <div class="row">
         <div class="text"><b>{sw.label}</b><small>{sw.note}{sw.guarded ? ' · 팀에서 꺼 두기로 한 설정' : ''}</small></div>
         <button class="switch" class:on={v.settings?.[sw.key]} role="switch" aria-checked={!!v.settings?.[sw.key]} aria-label={sw.label} disabled={busy} onclick={() => toggle(sw)}><i></i></button>
+      </div>
+    {/each}
+  </section>
+  {/if}
+
+  {#if section === 'team'}
+  <section>
+    <div class="head"><h2>팀원</h2><button class="add" onclick={() => editMember()}>＋ 팀원</button></div>
+    <p class="none">영역을 정하면 사이드바의 팀이 개발·디자인·마케팅으로 나뉘어요.</p>
+    {#each v.members ?? [] as m (m.id)}
+      <div class="row">
+        <span class="avatar">{Array.from(m.name)[0]}</span>
+        <div class="text"><b>{m.name}</b><small>{m.discord_id ? 'Discord 연결됨' : 'Discord ID 없음'}{githubOf(m.id) ? ` · GitHub @${githubOf(m.id)}` : ''}{m.channel_id ? ` · 업무 채널 ${channelName(m.channel_id)}` : ''}</small></div>
+        <select class="area" value={m.area ?? ''} disabled={busy} onchange={(e) => setArea(m.id, (e.target as HTMLSelectElement).value)} aria-label="{m.name} 영역">
+          {#each areaOptions as [value, label]}<option {value}>{label}</option>{/each}
+        </select>
+        <button class="edit" onclick={() => editMember(m.id)}>편집</button>
       </div>
     {/each}
   </section>
@@ -107,19 +132,12 @@
     {/each}
   </section>
 
-  <section>
-    <div class="head"><h2>팀원</h2><button class="add" onclick={() => editMember()}>＋ 팀원</button></div>
-    {#each v.members ?? [] as m (m.id)}
-      <div class="row">
-        <span class="avatar">{Array.from(m.name)[0]}</span>
-        <div class="text"><b>{m.name}</b><small>{m.discord_id ? 'Discord 연결됨' : 'Discord ID 없음'}{githubOf(m.id) ? ` · GitHub @${githubOf(m.id)}` : ''}{m.channel_id ? ` · 업무 채널 ${channelName(m.channel_id)}` : ''}</small></div>
-        <button class="edit" onclick={() => editMember(m.id)}>편집</button>
-      </div>
-    {/each}
-  </section>
+  {/if}
 
+  {#if section === 'repos'}
   <section>
     <h2>GitHub 저장소</h2>
+    <p class="none">연결한 저장소의 이슈·PR을 업무와 맞춰 봐요. 같은 업무 같다는 제안은 업무 상세에 작게 나와요.</p>
     {#each v.github?.repos ?? [] as r (r.id)}
       <div class="row">
         <div class="text"><b>{r.full_name}</b><small>{projectName(r.project_id)} · {r.error ? `오류: ${r.error}` : r.synced_at ? `마지막 동기화 ${new Date(r.synced_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '아직 불러오지 않았어요'}</small></div>
@@ -138,6 +156,7 @@
     </div>
     <p class="none">서버의 GitHub 읽기 권한으로 가져와요. 저장소에 무언가를 쓰지는 않아요.</p>
   </section>
+  {/if}
 </div>
 
 {#if editingProject}
@@ -174,6 +193,7 @@
     <label>Discord 사용자 ID<input bind:value={editingMember.discord_id} placeholder="숫자 ID (개발자 모드에서 복사)" spellcheck="false" /></label>
     <label>개인 업무 채널 ID<input bind:value={editingMember.channel_id} placeholder="선택" spellcheck="false" /></label>
     <label>GitHub 아이디<input bind:value={editingMember.github_login} placeholder="선택" spellcheck="false" /></label>
+    <label>영역<select bind:value={editingMember.area}>{#each areaOptions as [value, label]}<option {value}>{label}</option>{/each}</select></label>
     <p class="none">Discord ID가 있어야 Betty와 웹에 Discord로 로그인할 수 있어요.</p>
     <div class="actions"><button onclick={() => (editingMember = null)}>취소</button><button class="primary" disabled={busy} onclick={saveMember}>저장</button></div>
   </div>
@@ -210,6 +230,7 @@
   .sheet label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--fg2); }
   .sheet input, .sheet select { font: inherit; font-size: 13px; color: var(--fg); border: none; outline: none; background: var(--fill); border-radius: 7px; padding: 6px 8px; }
   .sheet input:focus, .sheet select:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  select.area { height: 26px; padding: 0 6px; border: none; outline: none; border-radius: 7px; background: var(--fill); font: inherit; font-size: 12px; color: inherit; }
   .lbl { margin: 0; font-size: 12px; color: var(--fg2); }
   .swatches { display: flex; gap: 6px; }
   .swatches button { width: 22px; height: 22px; border-radius: 50%; }

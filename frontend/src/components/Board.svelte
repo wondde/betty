@@ -10,7 +10,6 @@
 
   let { tickets, onselect, onerror }: { tickets: Ticket[]; onselect: (t: Ticket) => void; onerror: (m: string) => void } = $props()
 
-  let who = $state<'all' | 'mine' | 'unassigned'>('all')
   // Pointer-driven drag (HTML5 drag-and-drop is unreliable in the macOS webview).
   let dragging = $state<string | null>(null)
   let over = $state<string | null>(null)
@@ -19,7 +18,6 @@
   let dragged = false
   let moving = $state<Set<string>>(new Set())
 
-  const me = $derived(app.view.member?.id)
   const columns = [
     { status: 'todo', label: '할 일' },
     { status: 'in_progress', label: '진행 중' },
@@ -31,7 +29,6 @@
   const shown = $derived(
     tickets.filter(
       (t) =>
-        (who === 'all' || (who === 'mine' ? t.assignee_id === me : !t.assignee_id)) &&
         (t.status !== 'done' || nav.showDone || t.updated_at >= recent),
     ),
   )
@@ -91,14 +88,6 @@
 
 <svelte:window onpointermove={pointermove} onpointerup={pointerup} onkeydown={(e) => e.key === 'Escape' && dragging && ((press = null), (dragging = null), (ghost = null), (over = null))} />
 
-<div class="filters">
-  <div class="chips" role="radiogroup" aria-label="담당">
-    {#each [['all', '전체'], ['mine', '내 일'], ['unassigned', '담당자 없음']] as [value, label]}
-      <button role="radio" aria-checked={who === value} class:on={who === value} onclick={() => (who = value as typeof who)}>{label}</button>
-    {/each}
-  </div>
-</div>
-
 <div class="board" class:lifting={dragging}>
   {#each columns as c (c.status)}
     <section
@@ -140,11 +129,6 @@
 {#if ghost}<div class="ghost" style:left="{ghost.x + 8}px" style:top="{ghost.y + 8}px" aria-hidden="true">{ghost.title}</div>{/if}
 
 <style>
-  .filters { display: flex; align-items: center; gap: 8px; padding: 2px 8px 8px; }
-  .chips { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }
-  .chips button { height: 24px; padding: 0 10px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--fg2); }
-  .chips button.on { background: var(--card-solid, #fff); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
-  @media (prefers-color-scheme: dark) { .chips button.on { --card-solid: #48484a; } }
   .board { display: grid; grid-template-columns: repeat(4, minmax(190px, 1fr)); gap: 8px; min-height: calc(100% - 44px); overflow-x: auto; padding: 0 2px 4px; }
   .column { display: flex; flex-direction: column; min-width: 0; border-radius: 10px; background: var(--fill); transition: box-shadow 0.12s ease; }
   .column.over { box-shadow: inset 0 0 0 2px var(--accent); }

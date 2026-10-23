@@ -103,6 +103,26 @@
     }
   }
   const githubItems = $derived((app.view.github?.items ?? []).filter((i) => i.ticket_ids?.includes(ticket.id)))
+  // Betty's "same task?" guesses for this task, confirmed or rejected right here.
+  const guesses = $derived(
+    (app.view.github?.suggestions ?? [])
+      .filter((s) => s.ticket_id === ticket.id)
+      .map((s) => ({ s, i: app.view.github?.items?.find((x) => x.repo_id === s.repo_id && x.number === s.number) }))
+      .filter((g) => g.i),
+  )
+  let guessing = $state(false)
+  async function decide(repoID: string, number: number, same: boolean) {
+    guessing = true
+    try {
+      if (same) await Betty.LinkGitHub(ticket.id, repoID, number, false, false)
+      else await Betty.RejectGitHub(ticket.id, repoID, number)
+      onsaved(same ? '연결했어요' : '다른 업무로 기억할게요')
+    } catch (e) {
+      onerror(message(e))
+    } finally {
+      guessing = false
+    }
+  }
   const designs = $derived(app.view.designLinks?.[ticket.id] ?? [])
   const changeLabel: Record<string, string> = { linked: 'GitHub 연결', progressed: '진행 반영', completed: '완료 처리' }
   let changes = $state<Change[] | null>(null)
@@ -215,16 +235,23 @@
         <span class="kind">{i.kind === 'pr' ? 'PR' : '이슈'} #{i.number}</span><span class="name">{i.title}</span><span class="stage {tone}">{label}</span>
       </button>
     {/each}
+    {#each guesses as g (g.s.repo_id + g.s.number)}
+      <div class="guess" title={g.s.reason}>
+        <button class="name" onclick={() => Betty.OpenURL(g.i!.url)}><span class="q">같은 업무?</span> {g.i!.kind === 'pr' ? 'PR' : '이슈'} #{g.i!.number} {g.i!.title}</button>
+        <button class="yes" disabled={guessing} onclick={() => decide(g.s.repo_id, g.s.number, true)} title="같은 업무예요" aria-label="같은 업무예요">✓</button>
+        <button class="no" disabled={guessing} onclick={() => decide(g.s.repo_id, g.s.number, false)} title="다른 업무예요" aria-label="다른 업무예요">✕</button>
+      </div>
+    {/each}
     {#each designs as d (d.url)}
       <button class="link" onclick={() => Betty.OpenURL(d.url)} title={d.reason}><span class="kind">피그마</span><span class="name">{d.label}</span></button>
     {/each}
     {#if ticket.source_url}<button class="link" onclick={() => Betty.OpenURL(ticket.source_url)}><span class="kind">디스코드</span><span class="name">원문 대화</span></button>{/if}
-    {#if !githubItems.length && !designs.length && !ticket.source_url}<p class="note">연결된 PR·피그마·대화가 없어요.</p>{/if}
+    {#if !githubItems.length && !guesses.length && !designs.length && !ticket.source_url}<p class="note">연결된 PR·피그마·대화가 없어요.</p>{/if}
     <button class="link quiet" onclick={() => Betty.OpenBoard()}><span class="name">웹 보드에서 보기 ↗</span></button>
   </section>
 
-  <section class="block" aria-label="자동 정리 기록">
-    <h4>자동 정리 기록</h4>
+  <section class="block" aria-label="베티가 한 일">
+    <h4>베티가 한 일</h4>
     {#if changes === null}
       <p class="note">불러오는 중…</p>
     {:else if !changes.length}
@@ -302,6 +329,13 @@
   .link { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 8px; border-radius: 7px; background: var(--fill); text-align: left; font-size: 12px; }
   .link:hover { background: var(--fill-hover); }
   .link.quiet { background: none; color: var(--fg3); }
+  .guess { display: flex; align-items: center; gap: 4px; min-height: 26px; padding: 2px 4px 2px 8px; border-radius: 7px; border: 1px dashed var(--line); font-size: 11.5px; }
+  .guess .name { flex: 1; min-width: 0; text-align: left; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .guess .q { font-weight: 700; color: var(--orange); }
+  .guess .yes, .guess .no { flex: none; width: 22px; height: 22px; border-radius: 6px; font-size: 11px; }
+  .guess .yes { color: var(--green); }
+  .guess .no { color: var(--fg3); }
+  .guess .yes:hover, .guess .no:hover { background: var(--fill-hover); }
   .kind { flex: none; font-weight: 700; color: var(--fg2); }
   .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .stage { flex: none; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 700; background: var(--card-solid, rgba(255,255,255,0.6)); }

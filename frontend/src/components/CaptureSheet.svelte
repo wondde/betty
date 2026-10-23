@@ -1,7 +1,7 @@
 <script lang="ts">
   // 대화로 할 일 만들기 (⇧⌘N): paste a conversation from anywhere (KakaoTalk, meeting notes,
   // another Discord server) and Betty's extractor turns it into tasks. What it finds lands in
-  // "확인해 주세요" unless automatic tasks are on and the request is clear.
+  // "베티가 찾은 일" unless automatic tasks are on and the request is clear.
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { app, message } from '../lib/view.svelte'
@@ -24,7 +24,7 @@
     error = ''
     try {
       await Betty.Capture(content, project)
-      onsent('베티에게 정리를 맡겼어요. 찾은 일은 ‘확인해 주세요’에 올라와요')
+      onsent('베티에게 정리를 맡겼어요. 찾은 일은 ‘베티가 찾은 일’에 올라와요')
       onclose()
     } catch (e) {
       error = message(e)

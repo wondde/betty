@@ -22,7 +22,7 @@ export interface View {
     "projects": berry$0.Project[] | null;
 
     /**
-     * The review inbox ("확인해 주세요")
+     * The review inbox ("베티가 찾은 일")
      */
     "proposals": berry$0.Proposal[] | null;
     "meetingProposals": berry$0.MeetingProposal[] | null;
