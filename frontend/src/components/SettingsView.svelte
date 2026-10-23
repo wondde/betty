@@ -12,6 +12,13 @@
     tab?: string; onclose: () => void; ontour: () => void; onerror: (m: string) => void; onsaved: (m: string) => void
   } = $props()
 
+  // Messages show inside Settings: the main window's toast sits behind this screen.
+  let note = $state<{ text: string; ok: boolean } | null>(null)
+  let noteTimer: ReturnType<typeof setTimeout>
+  const show = (text: string, ok: boolean) => { note = { text, ok }; clearTimeout(noteTimer); noteTimer = setTimeout(() => (note = null), 4000) }
+  const err = (m: string) => (show(m, false), onerror(m))
+  const ok = (m: string) => (show(m, true), onsaved(m))
+
   let current = $state('general')
   $effect.pre(() => { current = tab })
   const tabs = $derived([
@@ -32,7 +39,7 @@
     try {
       await fn()
     } catch (e) {
-      onerror(message(e))
+      err(message(e))
     }
   }
 </script>
@@ -70,19 +77,20 @@
       <div class="row"><span>웹 보드</span><button onclick={() => Betty.OpenBoard()}>열기 ↗</button></div>
       <p class="muted small">Betty {app.view.version}</p>
     {:else if current === 'team'}
-      <AdminView section="team" {onerror} {onsaved} />
+      <AdminView section="team" onerror={err} onsaved={ok} />
     {:else if current === 'automation'}
-      <AdminView section="automation" {onerror} {onsaved} />
+      <AdminView section="automation" onerror={err} onsaved={ok} />
       <h2 class="gap">베티가 한 일</h2>
       <p class="muted small">베티가 스스로 GitHub 연결, 진행 반영, 완료 처리한 기록이에요. 틀린 건 되돌리세요. 업무 하나의 기록은 그 업무 상세에도 있어요.</p>
-      <History {onerror} {onsaved} />
+      <History onerror={err} onsaved={ok} />
     {:else if current === 'repos'}
-      <AdminView section="repos" {onerror} {onsaved} />
+      <AdminView section="repos" onerror={err} onsaved={ok} />
     {:else}
       <p class="muted small">지운 업무예요. 목록에서 빠지고, 베티가 같은 일을 다시 만들지 않아요.</p>
-      <TrashView {onerror} {onsaved} />
+      <TrashView onerror={err} onsaved={ok} />
     {/if}
   </section>
+  {#if note}<p class="note" class:ok={note.ok} role="status">{note.text}</p>{/if}
 </div>
 
 <style>
@@ -106,6 +114,8 @@
   .muted { color: var(--fg3); }
   .small { font-size: 12px; line-height: 1.5; margin: 4px 0 10px; }
   .on { color: var(--green); font-weight: 600; }
+  .note { position: fixed; left: 224px; right: 24px; bottom: 20px; z-index: 21; margin: 0; padding: 9px 14px; border-radius: 10px; background: rgba(30, 30, 32, 0.94); color: #fff; font-size: 12.5px; font-weight: 500; }
+  .note.ok { background: color-mix(in srgb, var(--green) 85%, black); }
   .switch { width: 36px; height: 22px; padding: 2px !important; border-radius: 11px !important; background: var(--fill-hover) !important; }
   .switch i { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.3); transition: transform 0.15s ease; }
   .switch.on { background: var(--green) !important; }

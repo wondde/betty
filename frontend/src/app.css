@@ -39,5 +39,8 @@ html, body { margin: 0; height: 100%; background: transparent; color: var(--fg);
 #app { height: 100%; }
 button { font: inherit; color: inherit; border: none; background: none; padding: 0; cursor: default; }
 input { font: inherit; color: inherit; }
+/* The page is unselectable like a native app, but fields must stay editable: WebKit
+   inherits user-select:none into inputs, which breaks selecting, copying and pasting. */
+input, textarea, select, [contenteditable] { user-select: text; -webkit-user-select: text; }
 ::-webkit-scrollbar { width: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

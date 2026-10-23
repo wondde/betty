@@ -85,10 +85,17 @@
   // ---------- repos ----------
   let repoName = $state('')
   let repoProject = $state('')
+  // Accepts owner/name or a pasted GitHub link (https://github.com/owner/name/…, .git, git@github.com:owner/name).
+  function repoFrom(input: string): string | null {
+    const t = input.trim().replace(/^git@github\.com:/i, '').replace(/^https?:\/\//i, '').replace(/^(www\.)?github\.com\//i, '').replace(/\.git$/i, '')
+    const [owner, name] = t.split(/[/?#]/).filter(Boolean)
+    return owner && name && /^[\w.-]+$/.test(owner) && /^[\w.-]+$/.test(name) ? `${owner}/${name.replace(/\.git$/i, '')}` : null
+  }
   async function addRepo() {
-    if (!/^[\w.-]+\/[\w.-]+$/.test(repoName.trim())) return onerror('저장소는 owner/name 형식으로 적어 주세요')
+    const repo = repoFrom(repoName)
+    if (!repo) return onerror('저장소 주소를 확인해 주세요. 예: blueberry-team/naru 또는 GitHub 링크')
     if (!repoProject) return onerror('저장소를 연결할 프로젝트를 골라 주세요')
-    if (await run(() => Betty.AddRepo(repoName.trim(), repoProject), '저장소를 연결했어요. 몇 분 안에 불러와요')) repoName = ''
+    if (await run(() => Betty.AddRepo(repo, repoProject), `${repo}를 연결했어요. 몇 분 안에 불러와요`)) repoName = ''
   }
   const projectName = (id: string) => v.projects?.find((p) => p.id === id)?.name ?? ''
 </script>
