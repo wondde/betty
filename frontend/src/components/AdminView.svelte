@@ -125,7 +125,7 @@
         <select class="area" value={m.area ?? ''} disabled={busy} onchange={(e) => setArea(m.id, (e.target as HTMLSelectElement).value)} aria-label="{m.name} 영역">
           {#each areaOptions as [value, label]}<option {value}>{label}</option>{/each}
         </select>
-        <button class="admin" class:on={m.is_admin} disabled={busy} onclick={() => run(() => Betty.SetAdmin(m.id, !m.is_admin), m.is_admin ? `${m.name}님은 이제 관리자가 아니에요` : `${m.name}님을 관리자로 정했어요`)}
+        <button class="role" class:on={m.is_admin} disabled={busy} onclick={() => run(() => Betty.SetAdmin(m.id, !m.is_admin), m.is_admin ? `${m.name}님은 이제 관리자가 아니에요` : `${m.name}님을 관리자로 정했어요`)}
           title={m.is_admin ? '관리자 해제' : '관리자로 정하기'}>{m.is_admin ? '관리자' : '팀원'}</button>
         <button class="edit" onclick={() => editMember(m.id)}>편집</button>
       </div>
@@ -230,8 +230,8 @@
   .edit, .add { height: 26px; padding: 0 10px; border-radius: 7px; background: var(--fill); font-size: 12px; font-weight: 600; flex: none; }
   .edit:hover, .add:hover { background: var(--fill-hover); }
   .danger { color: var(--red); }
-  .admin { height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--fg3); background: var(--fill); }
-  .admin.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .role { height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--fg3); background: var(--fill); }
+  .role.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .addrepo { display: flex; gap: 6px; margin-top: 8px; }
   .addrepo input, .addrepo select { height: 28px; padding: 0 8px; border: none; outline: none; border-radius: 7px; background: var(--fill); font: inherit; font-size: 12.5px; color: inherit; }
   .addrepo input { flex: 1; }

@@ -1,6 +1,7 @@
 <script lang="ts">
   // What the assistant did on its own (GitHub links, progress, completion), newest first,
-  // with the evidence it used. A wrong change can be undone from here.
+  // with the evidence it used. A wrong change can be undone from here. Several links made in
+  // one decision (same task, same reason, within a minute) show as one card.
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import type { Change } from '../../bindings/github.com/wondde/betty/internal/berry'
@@ -35,10 +36,27 @@
   }
   onMount(() => void load())
 
-  async function undo(c: Change) {
+  type Card = Change & { ids: string[]; undoable: string[] }
+  const cards = $derived.by(() => {
+    const out: Card[] = []
+    for (const c of items) {
+      const prev = out.at(-1)
+      const same = prev && prev.kind === c.kind && prev.ticket_id === c.ticket_id && prev.reason === c.reason &&
+        Math.abs(Date.parse(prev.created_at) - Date.parse(c.created_at)) < 60000 && !!prev.undone_at === !!c.undone_at
+      if (same) {
+        prev.ids.push(c.id)
+        if (c.can_undo) prev.undoable.push(c.id)
+        prev.links = [...(prev.links ?? []), ...(c.links ?? [])]
+        prev.evidence = [...(prev.evidence ?? []), ...(c.evidence ?? []).filter((e) => !prev.evidence?.some((x) => x.quote === e.quote && x.url === e.url))]
+      } else out.push({ ...c, links: [...(c.links ?? [])], evidence: [...(c.evidence ?? [])], ids: [c.id], undoable: c.can_undo ? [c.id] : [] })
+    }
+    return out
+  })
+
+  async function undo(c: Card) {
     busy = c.id
     try {
-      await Betty.Undo(c.id)
+      for (const id of c.undoable) await Betty.Undo(id)
       onsaved(`BT-${c.ticket.number} 자동 처리를 되돌렸어요`)
       await load()
     } catch (e) {
@@ -57,10 +75,10 @@
     <span class="total">{total}건</span>
   </div>
 
-  {#each items as c (c.id)}
+  {#each cards as c (c.id)}
     <article class="item" class:undone={!!c.undone_at}>
       <div class="top">
-        <span class="kind {c.kind}">{kindLabel[c.kind] ?? c.kind}</span>
+        <span class="kind {c.kind}">{kindLabel[c.kind] ?? c.kind}{c.ids.length > 1 ? ` ${c.ids.length}개` : ''}</span>
         <span class="time">{when(c.created_at)}</span>
       </div>
       <h3>BT-{c.ticket.number} {c.ticket.title}</h3>
@@ -82,7 +100,7 @@
       <div class="actions">
         {#if c.undone_at}
           <span class="done">{c.undone_by ? `${c.undone_by}님이 ` : ''}되돌렸어요</span>
-        {:else if c.can_undo}
+        {:else if c.undoable.length}
           <button disabled={busy === c.id} onclick={() => undo(c)}>되돌리기</button>
         {:else if c.undo_reason}
           <span class="muted">{c.undo_reason}</span>
