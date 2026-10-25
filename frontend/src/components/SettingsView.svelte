@@ -3,7 +3,7 @@
   // Everyone gets 일반 · 휴지통; admins also get 팀원·프로젝트 · 자동화 (with what Betty did) · GitHub.
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
-  import { app, message } from '../lib/view.svelte'
+  import { app, message, asAdmin, setAdminView } from '../lib/view.svelte'
   import AdminView from './AdminView.svelte'
   import History from './History.svelte'
   import TrashView from './TrashView.svelte'
@@ -23,7 +23,7 @@
   $effect.pre(() => { current = tab })
   const tabs = $derived([
     ['general', '일반', ''],
-    ...(app.view.isAdmin ? [['team', '팀원·프로젝트', ''], ['automation', '자동화', '베티가 무엇을 자동으로 하는지, 한 일 기록'], ['repos', 'GitHub', '']] : []),
+    ...(asAdmin() ? [['team', '팀원·프로젝트', ''], ['automation', '자동화', '베티가 무엇을 자동으로 하는지, 한 일 기록'], ['repos', 'GitHub', '']] : []),
     ['trash', `휴지통${app.view.trash?.length ? ` ${app.view.trash.length}` : ''}`, ''],
   ])
   // A tab someone can't see (or lost access to) falls back to 일반.
@@ -62,6 +62,12 @@
       <h2>계정</h2>
       <div class="row"><span>{app.view.member?.name}</span><button onclick={() => run(() => Betty.SignOut())}>로그아웃</button></div>
       <div class="row"><span class="muted">서버</span><span class="muted">{app.view.server?.replace(/^https?:\/\//, '')}</span></div>
+      {#if app.view.isAdmin}
+        <div class="row">
+          <span>관리자 화면<small class="muted"> · 끄면 다른 팀원이 보는 화면이 돼요</small></span>
+          <button class="switch" class:on={asAdmin()} role="switch" aria-checked={asAdmin()} aria-label="관리자 화면" onclick={() => setAdminView(!asAdmin())}><i></i></button>
+        </div>
+      {/if}
       <h2>이 기기</h2>
       <div class="row">
         <span>새 업무 알림</span>

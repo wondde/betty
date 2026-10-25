@@ -3,7 +3,7 @@
   // what waits for my answer, then the rest of my list (folded), then my team in a line per
   // person and the other teams as one summary line each.
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
-  import { app } from '../lib/view.svelte'
+  import { app, asAdmin } from '../lib/view.svelte'
   import { go, areaName, memberArea, type Area } from '../lib/nav.svelte'
   import { daysUntil, sortTasks } from '../lib/tasks'
   import TaskCard from './TaskCard.svelte'
@@ -49,7 +49,7 @@
   const late = $derived(mine.filter((t) => (daysUntil(t.due_date) ?? 0) < 0).length)
   const headline = $derived(!mine.length ? '오늘 남은 일이 없어요' : now.length ? `내 일 ${mine.length}개` : `내 일 ${mine.length}개, 급한 건 없어요`)
   // Finds are everyone's; they ask for me only when one would land on me (admins sort the rest).
-  const showFinds = $derived(finds > 0 && (findsForMe > 0 || v.isAdmin))
+  const showFinds = $derived(finds > 0 && (findsForMe > 0 || asAdmin()))
 </script>
 
 <div class="today">

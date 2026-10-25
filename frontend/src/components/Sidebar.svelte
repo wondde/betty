@@ -1,7 +1,7 @@
 <script lang="ts">
   // Sidebar, kept short: four places, my team (each person), the other teams (one row each),
   // then projects. Team setup lives in Settings, which admins reach from the gear at the bottom.
-  import { app } from '../lib/view.svelte'
+  import { app, asAdmin, setAdminView } from '../lib/view.svelte'
   import { nav, go, sameScope, areaName, memberArea, type Area, type Scope } from '../lib/nav.svelte'
 
   let { onsettings }: { onsettings: (tab?: string) => void } = $props()
@@ -11,7 +11,7 @@
   const me = $derived(v.member?.id)
   const found = $derived((v.proposals?.length ?? 0) + (v.meetingProposals?.length ?? 0) + (v.designQuestions?.length ?? 0))
   // Red only when something there waits on me (admins look after all of it).
-  const foundForMe = $derived(v.isAdmin || (v.proposals ?? []).some((p) => p.payload?.assignee_id === me))
+  const foundForMe = $derived(asAdmin() || (v.proposals ?? []).some((p) => p.payload?.assignee_id === me))
 
   const places = $derived([
     { scope: { kind: 'mine' } as Scope, icon: '☀︎', label: '오늘', count: open.filter((t) => t.assignee_id === me).length, hint: '내가 할 일과 확인할 것' },
@@ -77,7 +77,7 @@
         </button>
       {/each}
     {/if}
-    {#if myArea === 'none' && v.isAdmin}<button class="more hint" onclick={() => onsettings('team')}>팀원마다 개발·디자인·마케팅 영역을 정하면 자기 팀 일을 따로 볼 수 있어요</button>{/if}
+    {#if myArea === 'none' && asAdmin()}<button class="more hint" onclick={() => onsettings('team')}>팀원마다 개발·디자인·마케팅 영역을 정하면 자기 팀 일을 따로 볼 수 있어요</button>{/if}
 
     <h3><button onclick={() => fold('projects')} aria-expanded={!folded.projects}>프로젝트 <span class="chev" class:shut={folded.projects}>›</span></button></h3>
     {#if !folded.projects}
@@ -93,7 +93,14 @@
   </nav>
 
   <footer>
-    <span class="who">{v.member?.name}{#if v.isAdmin}<small>관리자</small>{/if}</span>
+    <span class="who">{v.member?.name}</span>
+    {#if v.isAdmin}
+      <!-- Admins switch between their own screen and the one everyone else sees. -->
+      <div class="seg" role="radiogroup" aria-label="화면">
+        <button role="radio" aria-checked={asAdmin()} class:on={asAdmin()} onclick={() => setAdminView(true)} title="팀원·프로젝트, GitHub, 자동화 설정까지 보여요">관리자</button>
+        <button role="radio" aria-checked={!asAdmin()} class:on={!asAdmin()} onclick={() => setAdminView(false)} title="다른 팀원이 보는 화면이에요">팀원</button>
+      </div>
+    {/if}
     <button class="gear" onclick={() => onsettings()} title="설정" aria-label="설정">
       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>
     </button>
@@ -127,7 +134,11 @@
   .more.hint { padding-left: 10px; line-height: 1.4; }
   footer { display: flex; align-items: center; justify-content: space-between; padding: 8px 6px 2px; border-top: 0.5px solid var(--line); }
   .who { font-size: 12px; color: var(--fg2); }
-  .who small { margin-left: 6px; padding: 0 5px; border-radius: 4px; font-size: 10px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .seg { display: flex; gap: 2px; margin-right: 4px; padding: 2px; border-radius: 7px; background: var(--fill); }
+  .seg button { height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11px; font-weight: 600; color: var(--fg3); }
+  .seg button.on { background: var(--card-solid, #fff); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+  @media (prefers-color-scheme: dark) { .seg button.on { --card-solid: #48484a; } }
   .gear { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; }
   .gear:hover { background: var(--fill-hover); }
   .gear svg { width: 15px; height: 15px; fill: none; stroke: var(--fg2); stroke-width: 1.4; stroke-linecap: round; }

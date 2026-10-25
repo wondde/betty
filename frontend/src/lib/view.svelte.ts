@@ -23,3 +23,12 @@ export function message(err: unknown): string {
   if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message)
   return String(err)
 }
+
+// Admins can switch to the screen everyone else sees (kept on this device). The server still
+// decides what an admin may change; this only hides team setup while looking as a member.
+export const viewMode = $state({ admin: localStorage.getItem('view:member') !== '1' })
+export const asAdmin = () => app.view.isAdmin && viewMode.admin
+export function setAdminView(on: boolean) {
+  viewMode.admin = on
+  localStorage.setItem('view:member', on ? '0' : '1')
+}
