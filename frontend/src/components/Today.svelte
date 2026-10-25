@@ -63,7 +63,7 @@
   <p class="headline">{headline}{#if late}<span class="late">마감 지난 일 {late}개</span>{/if}{#if doneToday}<span class="done">오늘 {doneToday}개 끝냈어요</span>{/if}</p>
 
   {#if now.length}
-    <section>
+    <section data-coach="now">
       <h2>지금 할 일</h2>
       {#each now as t (t.id)}
         <div data-task={t.id}><TaskCard ticket={t} isNew={isNew.has(t.id)} selected={selected === t.id} actions onselect={() => onselect(t)} {onerror} /></div>
@@ -72,7 +72,7 @@
   {/if}
 
   {#if showFinds || autoMine.length}
-    <section>
+    <section data-coach="ask">
       <h2>확인해 주세요</h2>
       {#if showFinds}
         <button class="ask" onclick={() => go({ kind: 'inbox' })}>
@@ -104,7 +104,7 @@
   {/if}
 
   {#if longTerm.length}
-    <section>
+    <section data-coach="long">
       <h2>길게 보는 일 <span class="n">{longTerm.length}</span><small>조금씩 진행하는 일이라 오래 그대로여도 괜찮아요</small></h2>
       {#each longTerm as t (t.id)}
         <div data-task={t.id}><TaskCard ticket={t} isNew={isNew.has(t.id)} selected={selected === t.id} onselect={() => onselect(t)} {onerror} /></div>

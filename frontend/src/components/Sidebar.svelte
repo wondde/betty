@@ -13,6 +13,7 @@
   // Red only when something there waits on me (admins look after all of it).
   const foundForMe = $derived(asAdmin() || (v.proposals ?? []).some((p) => p.payload?.assignee_id === me))
 
+  const coachName: Record<string, string> = { mine: 'nav-today', inbox: 'nav-inbox', team: 'nav-all', calendar: 'nav-calendar' }
   const places = $derived([
     { scope: { kind: 'mine' } as Scope, icon: '☀︎', label: '오늘', count: open.filter((t) => t.assignee_id === me).length, hint: '내가 할 일과 확인할 것' },
     { scope: { kind: 'inbox' } as Scope, icon: '✦', label: '베티가 찾은 일', count: found, badge: foundForMe, hint: '대화에서 찾은 할 일 후보 · 맞으면 넣기' },
@@ -49,13 +50,14 @@
 <aside class="sidebar">
   <nav aria-label="목록">
     {#each places as item}
-      <button class="row" class:active={sameScope(nav.scope, item.scope)} onclick={() => go(item.scope)} title={item.hint}>
+      <button class="row" class:active={sameScope(nav.scope, item.scope)} onclick={() => go(item.scope)} title={item.hint} data-coach={coachName[item.scope.kind]}>
         <span class="icon" aria-hidden="true">{item.icon}</span>
         <span class="label">{item.label}</span>
         {#if item.count}<span class="count" class:badge={item.badge}>{item.count}</span>{/if}
       </button>
     {/each}
 
+    <div class="team" data-coach="nav-team">
     <h3>
       {#if myArea === 'none'}팀{:else}<button onclick={() => go({ kind: 'area', id: myArea })}>우리 팀 · {areaName[myArea]}</button>{/if}
     </h3>
@@ -66,6 +68,7 @@
         {#if m.count}<span class="count">{m.count}</span>{/if}
       </button>
     {/each}
+    </div>
 
     {#if otherTeams.length}
       <h3>다른 팀</h3>
@@ -96,12 +99,12 @@
     <span class="who">{v.member?.name}</span>
     {#if v.isAdmin}
       <!-- Admins switch between their own screen and the one everyone else sees. -->
-      <div class="seg" role="radiogroup" aria-label="화면">
+      <div class="seg" role="radiogroup" aria-label="화면" data-coach="view-switch">
         <button role="radio" aria-checked={asAdmin()} class:on={asAdmin()} onclick={() => setAdminView(true)} title="팀원·프로젝트, GitHub, 자동화 설정까지 보여요">관리자</button>
         <button role="radio" aria-checked={!asAdmin()} class:on={!asAdmin()} onclick={() => setAdminView(false)} title="다른 팀원이 보는 화면이에요">팀원</button>
       </div>
     {/if}
-    <button class="gear" onclick={() => onsettings()} title="설정" aria-label="설정">
+    <button class="gear" onclick={() => onsettings()} title="설정" aria-label="설정" data-coach="settings">
       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" /><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" /></svg>
     </button>
   </footer>
@@ -110,7 +113,8 @@
 <style>
   .sidebar { width: 210px; flex: none; display: flex; flex-direction: column; padding: var(--top) 8px 8px; border-right: 0.5px solid var(--line); background: var(--sidebar, transparent); }
   nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
-  nav > * { flex-shrink: 0; } /* the list scrolls; rows never squash */
+  nav > *, .team > * { flex-shrink: 0; }
+  .team { display: flex; flex-direction: column; gap: 1px; } /* the list scrolls; rows never squash */
   h3 { margin: 16px 10px 4px; font-size: 11px; font-weight: 700; color: var(--fg3); }
   h3 button { display: flex; align-items: center; gap: 4px; width: 100%; font: inherit; color: inherit; }
   h3 button:hover { color: var(--fg2); }

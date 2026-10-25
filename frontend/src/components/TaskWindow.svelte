@@ -29,6 +29,7 @@
   import CleanupView from './CleanupView.svelte'
   import NowDoing from './NowDoing.svelte'
   import Today from './Today.svelte'
+  import Coach from './Coach.svelte'
   import { mod } from '../lib/platform'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
@@ -41,6 +42,21 @@
   let settings = $state<string | null>(null) // open tab, or null when closed
   const openSettings = (tab = 'general') => ((sheet = null), (settings = tab))
   let capturing = $state(false)
+  // 사용법 둘러보기 runs once per device right after the first-run tour (and again from 다시 보기).
+  let coaching = $state(false)
+  const COACH = 'coach:v1'
+  $effect(() => {
+    if (v.signedIn && v.onboarded && !tour && localStorage.getItem(COACH) !== '1' && !coaching) {
+      go({ kind: 'mine' })
+      settings = null
+      setTimeout(() => (coaching = true), 300)
+    }
+  })
+  function coachDone() {
+    localStorage.setItem(COACH, '1')
+    coaching = false
+  }
+  const replayTour = () => { localStorage.removeItem(COACH); tour = true }
   let cleaning = $state(false)
 
   // App menu commands (파일 · 편집 · 보기 · 도움말 …) arrive from Go as "betty:command".
@@ -69,7 +85,7 @@
       } else if (name === 'toggle-done') nav.showDone = !nav.showDone
       else if (name === 'onboarding') {
         sheet = null
-        tour = true
+        replayTour()
       } else if (name === 'settings') openSettings()
       else if (name === 'shortcuts' || name === 'about') sheet = name
     }),
@@ -224,13 +240,13 @@
       return
     }
     // ⌘⌫ moves the selected task to the trash (only outside text fields).
-    if (!typing && !sheet && !capturing && !cleaning && !settings && e.metaKey && e.key === 'Backspace' && selected && isTaskList(nav.scope)) {
+    if (!typing && !sheet && !capturing && !cleaning && !settings && !coaching && e.metaKey && e.key === 'Backspace' && selected && isTaskList(nav.scope)) {
       e.preventDefault()
       const t = selected
       trash(t)
       return
     }
-    if (typing || sheet || capturing || cleaning || settings || asking.current || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
+    if (typing || sheet || capturing || cleaning || settings || coaching || asking.current || !(e.key === 'ArrowDown' || e.key === 'ArrowUp') || !flat.length) return
     e.preventDefault()
     const i = flat.findIndex((t) => t.id === nav.selected)
     const next = e.key === 'ArrowDown' ? Math.min(flat.length - 1, i + 1) : Math.max(0, i < 0 ? 0 : i - 1)
@@ -336,7 +352,7 @@
       </section>
 
       {#if isTaskList(nav.scope)}
-        <footer>
+        <footer data-coach="composer">
           {#if toast}<p class="toast" class:ok={toast.ok}>{toast.text}</p>{/if}
           <Composer bind:this={composer} onresult={(text, ok) => say(text, ok)} />
         </footer>
@@ -352,8 +368,9 @@
   <AskDialog />
   {#if capturing}<CaptureSheet onclose={() => (capturing = false)} onsent={(m) => say(m, true)} />{/if}
   {#if cleaning}<CleanupView project={nav.project} onclose={() => (cleaning = false)} onsaved={(m) => say(m, true)} onerror={(m) => say(m)} />{/if}
-  {#if settings}<SettingsView tab={settings} onclose={() => (settings = null)} ontour={() => ((settings = null), (tour = true))} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />{/if}
-  {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), (tour = true))} />{/if}
+  {#if coaching}<Coach ondone={coachDone} />{/if}
+  {#if settings}<SettingsView tab={settings} onclose={() => (settings = null)} ontour={() => ((settings = null), replayTour())} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />{/if}
+  {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), replayTour())} />{/if}
 {/if}
 
 <style>
