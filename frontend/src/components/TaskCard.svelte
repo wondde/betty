@@ -13,9 +13,10 @@
     showAssignee = false,
     showProject = true,
     showStatus = true,
+    actions = false,
     onselect,
     onerror,
-  }: { ticket: Ticket; isNew?: boolean; selected?: boolean; showAssignee?: boolean; showProject?: boolean; showStatus?: boolean; onselect: () => void; onerror: (m: string) => void } = $props()
+  }: { ticket: Ticket; isNew?: boolean; selected?: boolean; showAssignee?: boolean; showProject?: boolean; showStatus?: boolean; actions?: boolean; onselect: () => void; onerror: (m: string) => void } = $props()
 
   let finishing = $state(false)
   let busy = $state(false)
@@ -83,7 +84,14 @@
   {#if showAssignee}
     <span class="who" title={assignee ? `${assignee.name}${auto ? ' · 자동 배정' : ''}` : '담당자 없음'} class:none={!assignee} class:auto>{assignee ? initial(assignee.name) : ''}</span>
   {/if}
-  {#if !done && ticket.status !== 'blocked'}
+  {#if actions && !done}
+    <!-- Home rows keep the next step in view, in words: start what hasn't started, finish the rest. -->
+    {#if ticket.status === 'todo'}
+      <button class="act" onclick={(e) => (e.stopPropagation(), set('in_progress'))} disabled={busy}>시작</button>
+    {:else}
+      <button class="act finish" onclick={toggleDone} disabled={busy}>{finishing ? '되돌리기' : '완료'}</button>
+    {/if}
+  {:else if !done && ticket.status !== 'blocked'}
     <button class="quick" class:working onclick={(e) => (e.stopPropagation(), set(working ? 'todo' : 'in_progress'))} disabled={busy} title={working ? '할 일로 되돌리기' : '시작하기'} aria-label={working ? '할 일로 되돌리기' : '시작하기'}>
       {#if working}
         <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2" width="2.4" height="8" rx="0.6" /><rect x="7.1" y="2" width="2.4" height="8" rx="0.6" /></svg>
@@ -133,5 +141,9 @@
   .row:hover .quick, .quick:focus-visible { opacity: 1; }
   .quick.working svg { fill: var(--accent); }
   .quick:hover { background: var(--fill-hover); }
+  .act { flex: none; height: 26px; padding: 0 12px; border-radius: 13px; font-size: 12px; font-weight: 700; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+  .act:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+  .act.finish { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+  .act.finish:hover { background: color-mix(in srgb, var(--green) 24%, transparent); }
   button:disabled { opacity: 0.5; }
 </style>

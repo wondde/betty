@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.9.3"
+const version = "0.10.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -31,6 +31,7 @@ type View struct {
 	SignedIn  bool            `json:"signedIn"`
 	SigningIn bool            `json:"signingIn"`
 	Member    *berry.Member   `json:"member"`
+	IsAdmin   bool            `json:"isAdmin"` // admins see team setup (members, projects, GitHub, automation)
 	Tickets   []berry.Ticket  `json:"tickets"` // every task on the board; mine have assignee_id == member.id
 	Members   []berry.Member  `json:"members"`
 	Projects  []berry.Project `json:"projects"`
@@ -100,6 +101,12 @@ func (b *Betty) View() View {
 	b.mu.Unlock()
 	if s := d.Snapshot; s != nil && v.SignedIn {
 		v.Member = &berry.Member{ID: s.User.ID, Name: s.User.Name}
+		v.IsAdmin = s.User.IsAdmin
+		for _, m := range s.Members {
+			if m.ID == s.User.ID {
+				v.Member.Area = m.Area
+			}
+		}
 		v.Tickets, v.Members, v.Projects = s.Tasks(), s.Members, s.Projects
 		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
 		v.Meetings = s.Calendar.Meetings
@@ -516,6 +523,11 @@ func (b *Betty) SaveMember(id string, in berry.MemberInput) error {
 
 func (b *Betty) SetSetting(key string, on bool) error {
 	return b.inbox(func(ctx context.Context) error { return b.client.SetSetting(ctx, key, on) })
+}
+
+// SetAdmin gives or takes away team-setup rights for a member.
+func (b *Betty) SetAdmin(memberID string, on bool) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.SetAdmin(ctx, memberID, on) })
 }
 
 func (b *Betty) inbox(call func(context.Context) error) error {

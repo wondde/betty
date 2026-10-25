@@ -248,6 +248,7 @@ export interface Member {
      * engineering | design | marketing | ""
      */
     "area"?: string;
+    "is_admin"?: boolean;
 }
 
 export interface MemberInput {

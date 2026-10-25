@@ -117,7 +117,7 @@
   {#if section === 'team'}
   <section>
     <div class="head"><h2>팀원</h2><button class="add" onclick={() => editMember()}>＋ 팀원</button></div>
-    <p class="none">영역을 정하면 사이드바의 팀이 개발·디자인·마케팅으로 나뉘어요.</p>
+    <p class="none">영역을 정하면 각자 자기 팀 일을 자세히, 다른 팀은 요약으로 봐요. 관리자는 팀원·프로젝트·GitHub·자동화를 바꿀 수 있어요.</p>
     {#each v.members ?? [] as m (m.id)}
       <div class="row">
         <span class="avatar">{Array.from(m.name)[0]}</span>
@@ -125,6 +125,8 @@
         <select class="area" value={m.area ?? ''} disabled={busy} onchange={(e) => setArea(m.id, (e.target as HTMLSelectElement).value)} aria-label="{m.name} 영역">
           {#each areaOptions as [value, label]}<option {value}>{label}</option>{/each}
         </select>
+        <button class="admin" class:on={m.is_admin} disabled={busy} onclick={() => run(() => Betty.SetAdmin(m.id, !m.is_admin), m.is_admin ? `${m.name}님은 이제 관리자가 아니에요` : `${m.name}님을 관리자로 정했어요`)}
+          title={m.is_admin ? '관리자 해제' : '관리자로 정하기'}>{m.is_admin ? '관리자' : '팀원'}</button>
         <button class="edit" onclick={() => editMember(m.id)}>편집</button>
       </div>
     {/each}
@@ -228,6 +230,8 @@
   .edit, .add { height: 26px; padding: 0 10px; border-radius: 7px; background: var(--fill); font-size: 12px; font-weight: 600; flex: none; }
   .edit:hover, .add:hover { background: var(--fill-hover); }
   .danger { color: var(--red); }
+  .admin { height: 26px; padding: 0 9px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--fg3); background: var(--fill); }
+  .admin.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
   .addrepo { display: flex; gap: 6px; margin-top: 8px; }
   .addrepo input, .addrepo select { height: 28px; padding: 0 8px; border: none; outline: none; border-radius: 7px; background: var(--fill); font: inherit; font-size: 12.5px; color: inherit; }
   .addrepo input { flex: 1; }

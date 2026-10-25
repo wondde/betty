@@ -1,17 +1,17 @@
 <script lang="ts">
   import { ask, asking } from '../lib/ask.svelte'
   import AskDialog from './AskDialog.svelte'
-  // Main window, Mac three-pane layout:
-  //   sidebar (내 할 일 · 팀 할 일 · 베티가 찾은 일 · 캘린더 · projects · team by area)
-  //   | list (or board) for that place, with search (⌘F) and an add field
-  //   | detail pane for the selected task. Settings (⌘,) cover the window.
+  // Main window, three panes:
+  //   sidebar (오늘 · 베티가 찾은 일 · 모든 업무 · 캘린더 · my team · other teams · projects)
+  //   | 오늘 home, or the list (or board) for that place, with search and an add field
+  //   | detail pane for the selected task. Settings cover the window.
   import { onMount } from 'svelte'
   import { Events } from '@wailsio/runtime'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { BettyCommand } from '../../bindings/events'
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, message } from '../lib/view.svelte'
-  import { nav, go, isTaskList, byProject, areaName, memberArea } from '../lib/nav.svelte'
+  import { nav, go, isTaskList, byProject, areaName, memberArea, type Area } from '../lib/nav.svelte'
   import { daysUntil, groupByProject, groupByStatus, matches, needsCleanup, sortTasks, statusLabel, todayLabel, type Group } from '../lib/tasks'
   import ProjectChips from './ProjectChips.svelte'
   import Sidebar from './Sidebar.svelte'
@@ -28,6 +28,8 @@
   import SettingsView from './SettingsView.svelte'
   import CleanupView from './CleanupView.svelte'
   import NowDoing from './NowDoing.svelte'
+  import Today from './Today.svelte'
+  import { mod } from '../lib/platform'
 
   let toast = $state<{ text: string; ok: boolean } | null>(null)
   let refreshing = $state(false)
@@ -80,8 +82,8 @@
 
   const scopeTitle = $derived.by(() => {
     const s = nav.scope
-    if (s.kind === 'mine') return '내 할 일'
-    if (s.kind === 'team') return '팀 할 일'
+    if (s.kind === 'mine') return '오늘'
+    if (s.kind === 'team') return '모든 업무'
     if (s.kind === 'inbox') return '베티가 찾은 일'
     if (s.kind === 'calendar') return '캘린더'
     if (s.kind === 'area') return `${areaName[s.id]} 팀`
@@ -91,6 +93,10 @@
 
   const areaMembers = $derived(new Set(nav.scope.kind === 'area' ? (v.members ?? []).filter((m) => memberArea(m) === (nav.scope as { id: string }).id).map((m) => m.id) : []))
   const boardMode = $derived(nav.scope.kind === 'team' && nav.board)
+  // Other teams open as a summary; their full list waits behind a button.
+  const otherTeam = $derived(nav.scope.kind === 'area' && nav.scope.id !== memberArea(v.member ?? {}) && memberArea(v.member ?? {}) !== 'none')
+  let showOtherList = $state(false)
+  $effect(() => { void nav.scope; showOtherList = false })
   const unassignedCount = $derived(all.filter((t) => t.status !== 'done' && !t.assignee_id).length)
   const cleanupCount = $derived(all.filter((t) => needsCleanup(t) && (!nav.project || t.project?.id === nav.project)).length)
 
@@ -167,7 +173,7 @@
       case 'calendar': return '팀 회의 일정 · 한국·일본 시간'
       case 'team': return boardMode ? `${summary} · 카드를 끌어 상태를 바꿔요` : nav.unassigned ? `아직 아무도 맡지 않은 일 · ${summary}` : summary
       case 'area': return `${summary} · 사람별로 묶었어요`
-      case 'mine': return `${todayLabel()} · ${summary}`
+      case 'mine': return `${v.member?.name ?? ''}님 · ${todayLabel()}`
       default: return summary
     }
   })
@@ -253,7 +259,7 @@
           {#if isTaskList(nav.scope)}
             <label class="search">
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5L14 14" /></svg>
-              <input bind:this={search} bind:value={nav.query} placeholder="검색 (⌘F)" aria-label="업무 검색" spellcheck="false" />
+              <input bind:this={search} bind:value={nav.query} placeholder={`검색 (${mod}F)`} aria-label="업무 검색" spellcheck="false" />
             </label>
             {#if nav.scope.kind === 'team' && cleanupCount}
               <button class="tidy" onclick={() => (cleaning = true)} title="아무도 안 맡았거나 일주일 넘게 그대로인 일을 하나씩 정리해요">정리하기 <span>{cleanupCount}</span></button>
@@ -287,10 +293,16 @@
           <Inbox onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'calendar'}
           <Calendar onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
+        {:else if nav.scope.kind === 'mine' && !searching}
+          <Today selected={nav.selected} {isNew} onselect={select} onerror={(m) => say(m)} />
         {:else if boardMode}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
           {#if (nav.scope.kind === 'team' && !nav.unassigned) || nav.scope.kind === 'area'}<NowDoing tickets={inScope} onselect={select} />{/if}
+          {#if otherTeam && !showOtherList && !searching}
+            <!-- Another team: who is on what is enough; the full list is one click away. -->
+            <button class="showall" onclick={() => (showOtherList = true)}>{areaName[(nav.scope as { id: Area }).id]} 팀 업무 목록 모두 보기 · {visible.length}개</button>
+          {:else}
           {#each groups as g (g.key)}
             <h2 class:section={g.color} style:--pc={g.color}>
               <button onclick={() => toggleGroup(g.key)} aria-expanded={!collapsed.has(g.key)}>
@@ -317,6 +329,7 @@
               {/if}
             </div>
           {/each}
+          {/if}
         {/if}
       </section>
 
@@ -383,6 +396,8 @@
   .inbox-tools button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 9px; border: 1px dashed var(--line); color: var(--fg2); font-size: 12.5px; font-weight: 600; }
   .inbox-tools button:hover { background: var(--fill); color: var(--fg); }
   .inbox-tools span { font-weight: 500; color: var(--fg3); font-size: 11px; }
+  .showall { width: calc(100% - 8px); margin: 6px 4px; padding: 9px 12px; border-radius: 9px; border: 1px dashed var(--line); font-size: 12.5px; font-weight: 600; color: var(--fg2); }
+  .showall:hover { background: var(--fill); color: var(--fg); }
   .tidy { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); }
   .tidy span { font-weight: 500; opacity: 0.85; }
   .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }

@@ -191,9 +191,9 @@ func main() {
 
 	viewMenu := menu.AddSubmenu("보기")
 	for _, v := range []struct{ label, key, cmd string }{
-		{"내 할 일", "CmdOrCtrl+1", "go-mine"},
-		{"팀 할 일", "CmdOrCtrl+2", "go-team"},
-		{"베티가 찾은 일", "CmdOrCtrl+3", "go-inbox"},
+		{"오늘", "CmdOrCtrl+1", "go-mine"},
+		{"베티가 찾은 일", "CmdOrCtrl+2", "go-inbox"},
+		{"모든 업무", "CmdOrCtrl+3", "go-team"},
 		{"캘린더", "CmdOrCtrl+4", "go-calendar"},
 		{"목록/보드 전환", "CmdOrCtrl+B", "toggle-board"},
 	} {

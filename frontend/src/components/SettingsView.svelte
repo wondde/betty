@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Settings (⌘,): everything that isn't day-to-day work, in tabs, so the sidebar stays
-  // about tasks. 일반 · 팀원·프로젝트 · 자동화 (with what Betty did) · GitHub · 휴지통.
+  // Settings: everything that isn't day-to-day work, in tabs, so the sidebar stays about tasks.
+  // Everyone gets 일반 · 휴지통; admins also get 팀원·프로젝트 · 자동화 (with what Betty did) · GitHub.
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { app, message } from '../lib/view.svelte'
@@ -23,11 +23,11 @@
   $effect.pre(() => { current = tab })
   const tabs = $derived([
     ['general', '일반', ''],
-    ['team', '팀원·프로젝트', ''],
-    ['automation', '자동화', '베티가 무엇을 자동으로 하는지, 한 일 기록'],
-    ['repos', 'GitHub', ''],
+    ...(app.view.isAdmin ? [['team', '팀원·프로젝트', ''], ['automation', '자동화', '베티가 무엇을 자동으로 하는지, 한 일 기록'], ['repos', 'GitHub', '']] : []),
     ['trash', `휴지통${app.view.trash?.length ? ` ${app.view.trash.length}` : ''}`, ''],
   ])
+  // A tab someone can't see (or lost access to) falls back to 일반.
+  $effect(() => { if (!tabs.some(([id]) => id === current)) current = 'general' })
 
   let notifications = $state(false)
   let autostart = $state(false)
@@ -62,7 +62,7 @@
       <h2>계정</h2>
       <div class="row"><span>{app.view.member?.name}</span><button onclick={() => run(() => Betty.SignOut())}>로그아웃</button></div>
       <div class="row"><span class="muted">서버</span><span class="muted">{app.view.server?.replace(/^https?:\/\//, '')}</span></div>
-      <h2>이 Mac</h2>
+      <h2>이 기기</h2>
       <div class="row">
         <span>새 업무 알림</span>
         {#if notifications}<span class="on">켜짐</span>{:else}<button onclick={() => run(async () => { notifications = await Betty.AllowNotifications() })}>허용하기</button>{/if}

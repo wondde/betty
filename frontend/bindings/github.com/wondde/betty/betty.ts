@@ -189,6 +189,13 @@ export function SaveProject(id: string, name: string, channelIDs: string[] | nul
     return $Call.ByID(3217617098, id, name, channelIDs, color);
 }
 
+/**
+ * SetAdmin gives or takes away team-setup rights for a member.
+ */
+export function SetAdmin(memberID: string, on: boolean): $CancellablePromise<void> {
+    return $Call.ByID(895155267, memberID, on);
+}
+
 export function SetAutostart(on: boolean): $CancellablePromise<void> {
     return $Call.ByID(3011510521, on);
 }

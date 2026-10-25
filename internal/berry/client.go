@@ -26,6 +26,7 @@ type Member struct {
 	DiscordID string `json:"discord_id,omitempty"`
 	ChannelID string `json:"channel_id,omitempty"` // personal work channel
 	Area      string `json:"area,omitempty"`       // engineering | design | marketing | ""
+	IsAdmin   bool   `json:"is_admin,omitempty"`
 }
 
 type Ticket struct {

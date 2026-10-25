@@ -6,7 +6,8 @@
   import { app } from '../lib/view.svelte'
   import { go } from '../lib/nav.svelte'
 
-  let { tickets, onselect }: { tickets: Ticket[]; onselect: (t: Ticket) => void } = $props()
+  // plain: no header or fold (the home screen titles it itself).
+  let { tickets, onselect, plain = false }: { tickets: Ticket[]; onselect: (t: Ticket) => void; plain?: boolean } = $props()
 
   const people = $derived.by(() => {
     const by = new Map<string, Ticket[]>()
@@ -25,11 +26,13 @@
 
 {#if people.length || nobody}
   <section class="now">
+    {#if !plain}
     <button class="head" onclick={toggle} aria-expanded={open}>
       <span class="chev" class:shut={!open}>›</span> 지금 하고 있는 일 <span class="n">{people.length}명</span>
       {#if nobody}<span class="warn" title="진행 중인데 맡은 사람이 없는 일이에요. 정리하기에서 담당을 정해 주세요">담당 없는 진행 중 {nobody}</span>{/if}
     </button>
-    {#if open}
+    {/if}
+    {#if open || plain}
       {#each people as p (p.id)}
         <div class="row">
           <button class="who" onclick={() => go({ kind: 'member', id: p.id })}><span class="avatar">{Array.from(p.name)[0]}</span>{p.name}</button>

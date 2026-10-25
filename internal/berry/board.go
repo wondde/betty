@@ -89,9 +89,10 @@ type DesignLink struct {
 }
 
 type BoardUser struct {
-	Role string `json:"role"`
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	Role    string `json:"role"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	IsAdmin bool   `json:"is_admin"` // may change team setup (members, projects, GitHub, automation)
 }
 
 // BoardTicket is a task row as the board API returns it.
@@ -515,4 +516,9 @@ func (c *Client) SaveMember(ctx context.Context, id string, in MemberInput) erro
 // SetSetting flips one automation switch (see the board's /api/settings for the allowed keys).
 func (c *Client) SetSetting(ctx context.Context, key string, on bool) error {
 	return c.do(ctx, http.MethodPost, "/api/settings", map[string]any{key: on}, true, nil)
+}
+
+// SetAdmin makes a member an admin or takes it away (admins only; one admin always stays).
+func (c *Client) SetAdmin(ctx context.Context, memberID string, on bool) error {
+	return c.do(ctx, http.MethodPatch, "/api/members/"+url.PathEscape(memberID)+"/admin", map[string]any{"admin": on}, true, nil)
 }

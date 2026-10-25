@@ -15,6 +15,11 @@ export interface View {
     "member": berry$0.Member | null;
 
     /**
+     * admins see team setup (members, projects, GitHub, automation)
+     */
+    "isAdmin": boolean;
+
+    /**
      * every task on the board; mine have assignee_id == member.id
      */
     "tickets": berry$0.Ticket[] | null;
