@@ -277,7 +277,7 @@
 </section>
 
 <style>
-  .detail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; padding: 46px 16px 14px; border-left: 0.5px solid var(--line); overflow-y: auto; }
+  .detail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 10px; padding: var(--top) 16px 14px; border-left: 0.5px solid var(--line); overflow-y: auto; }
   .detail > * { flex-shrink: 0; } /* the pane scrolls; nothing squeezes */
   header { display: flex; align-items: center; justify-content: space-between; }
   .num { font-size: 12px; font-weight: 700; color: var(--fg3); font-variant-numeric: tabular-nums; }

@@ -8,7 +8,8 @@
     "build:dev": "vite build --minify false --mode development",
     "build": "vite build --mode production",
     "preview": "vite preview",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "build:web": "vite build --config vite.web.config.ts"
   },
   "dependencies": {
     "@wailsio/runtime": "latest"

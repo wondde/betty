@@ -359,7 +359,7 @@
   .titlebar { position: fixed; top: 0; left: 0; right: 0; height: 40px; --wails-draggable: drag; z-index: 5; }
   .layout { height: 100%; display: flex; }
   main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 44px 18px 8px; }
+  header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: calc(var(--top) - 2px) 18px 8px; }
   .heading { min-width: 0; }
   h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.4px; }
   .sub { margin: 2px 0 0; font-size: 11.5px; color: var(--fg3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -1,7 +1,7 @@
 /* Native macOS feel: the window itself is Liquid Glass (set in Go); the page stays transparent. */
 :root {
   color-scheme: light dark;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Segoe UI", "Malgun Gothic", sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
   --fg: #1d1d1f;
@@ -17,7 +17,13 @@
   --green: #34c759;
   --discord: #5865f2;
   --sticky: rgba(246, 246, 248, 0.88); /* section headers that scroll over the glass */
+  --top: 46px; /* room for the Mac app's traffic lights */
 }
+/* A browser tab (and later Windows) has no glass and no traffic lights inside the page. */
+:root:not([data-shell="mac"]) { --top: 16px; }
+:root[data-shell="web"] body { background: #f5f5f7; }
+:root[data-shell="web"] button, :root[data-shell="web"] [role="button"] { cursor: pointer; }
+@media (prefers-color-scheme: dark) { :root[data-shell="web"] body { background: #1c1c1e; } }
 @media (prefers-color-scheme: dark) {
   :root {
     --fg: #f5f5f7;

@@ -4,6 +4,7 @@
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { app, message } from '../lib/view.svelte'
+  import { isWeb } from '../lib/platform'
 
   let { ondone }: { ondone: () => void } = $props()
 
@@ -17,7 +18,7 @@
     autostart = await Betty.Autostart()
   })
 
-  const steps = [
+  const allSteps = [
     {
       icon: '👋',
       title: `${app.view.member?.name ?? ''}님, 반가워요`,
@@ -37,7 +38,7 @@
     {
       icon: '✍️',
       title: '할 일은 이렇게 적어요',
-      body: '맨 아래 입력창이나 ⌘N으로 추가해요. 담당자는 @, 프로젝트는 #, 마감은 "내일", "금요일까지", "10/24"처럼 쓰면 돼요.',
+      body: isWeb ? '맨 아래 입력창에 적어서 추가해요. 담당자는 @, 프로젝트는 #, 마감은 "내일", "금요일까지", "10/24"처럼 쓰면 돼요.' : '맨 아래 입력창이나 ⌘N으로 추가해요. 담당자는 @, 프로젝트는 #, 마감은 "내일", "금요일까지", "10/24"처럼 쓰면 돼요.',
       demo: 'compose',
     },
     {
@@ -49,10 +50,12 @@
     {
       icon: '🔔',
       title: '마지막으로 두 가지만',
-      body: '새 업무가 배정되면 알림으로 알려 드릴게요. 맥을 켤 때 Betty가 자동으로 열리게 할 수도 있어요.',
+      body: isWeb ? '새 업무가 배정되면 브라우저 알림으로 알려 드릴게요. 이 탭을 열어 두면 돼요.' : '새 업무가 배정되면 알림으로 알려 드릴게요. 맥을 켤 때 Betty가 자동으로 열리게 할 수도 있어요.',
       demo: 'permissions',
     },
   ]
+  // A browser tab has no system-wide shortcuts and doesn't open at login.
+  const steps = allSteps.filter((s) => !isWeb || s.demo !== 'keys')
   const last = steps.length - 1
 
   async function allowNotifications() {
@@ -115,9 +118,11 @@
           <button class="perm" onclick={allowNotifications} disabled={notifications}>
             <span>🔔 새 업무 알림</span><b>{notifications ? '켜짐' : '허용하기'}</b>
           </button>
-          <button class="perm" onclick={toggleAutostart}>
-            <span>🚀 로그인 시 자동 실행</span><b>{autostart ? '켜짐' : '꺼짐'}</b>
-          </button>
+          {#if !isWeb}
+            <button class="perm" onclick={toggleAutostart}>
+              <span>🚀 로그인 시 자동 실행</span><b>{autostart ? '켜짐' : '꺼짐'}</b>
+            </button>
+          {/if}
           {#if error}<p class="error">{error}</p>{/if}
         </div>
       {/if}

@@ -138,7 +138,7 @@
 </div>
 
 <style>
-  .cleanup { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; padding: 46px 40px 24px; background: var(--settings-bg, #f5f5f7); color: var(--fg); }
+  .cleanup { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; padding: var(--top) 40px 24px; background: var(--settings-bg, #f5f5f7); color: var(--fg); }
   @media (prefers-color-scheme: dark) { .cleanup { --settings-bg: #1e1e20; } }
   .drag { position: absolute; top: 0; left: 0; right: 0; height: 40px; --wails-draggable: drag; }
   header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }

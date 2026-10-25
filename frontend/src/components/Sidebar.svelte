@@ -108,7 +108,7 @@
 </aside>
 
 <style>
-  .sidebar { width: 210px; flex: none; display: flex; flex-direction: column; padding: 46px 8px 8px; border-right: 0.5px solid var(--line); background: var(--sidebar, transparent); }
+  .sidebar { width: 210px; flex: none; display: flex; flex-direction: column; padding: var(--top) 8px 8px; border-right: 0.5px solid var(--line); background: var(--sidebar, transparent); }
   nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
   nav > * { flex-shrink: 0; } /* the list scrolls; rows never squash */
   h3 { margin: 16px 10px 4px; font-size: 11px; font-weight: 700; color: var(--fg3); }

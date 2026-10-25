@@ -4,6 +4,7 @@
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { app, message, asAdmin, setAdminView } from '../lib/view.svelte'
+  import { isWeb } from '../lib/platform'
   import AdminView from './AdminView.svelte'
   import History from './History.svelte'
   import TrashView from './TrashView.svelte'
@@ -73,14 +74,16 @@
         <span>새 업무 알림</span>
         {#if notifications}<span class="on">켜짐</span>{:else}<button onclick={() => run(async () => { notifications = await Betty.AllowNotifications() })}>허용하기</button>{/if}
       </div>
+      {#if !isWeb}
       <div class="row">
         <span>로그인 시 자동 실행</span>
         <button class="switch" class:on={autostart} role="switch" aria-checked={autostart} aria-label="로그인 시 자동 실행"
           onclick={() => run(async () => { await Betty.SetAutostart(!autostart); autostart = !autostart })}><i></i></button>
       </div>
+      {/if}
       <h2>도움말</h2>
       <div class="row"><span>Betty 사용법</span><button onclick={ontour}>다시 보기</button></div>
-      <div class="row"><span>웹 보드</span><button onclick={() => Betty.OpenBoard()}>열기 ↗</button></div>
+      {#if !isWeb}<div class="row"><span>웹 보드</span><button onclick={() => Betty.OpenBoard()}>열기 ↗</button></div>{/if}
       <p class="muted small">Betty {app.view.version}</p>
     {:else if current === 'team'}
       <AdminView section="team" onerror={err} onsaved={ok} />
@@ -103,14 +106,14 @@
   .settings { position: fixed; inset: 0; z-index: 20; display: flex; background: var(--settings-bg, #f5f5f7); color: var(--fg); }
   @media (prefers-color-scheme: dark) { .settings { --settings-bg: #1e1e20; } }
   .drag { position: absolute; top: 0; left: 0; right: 0; height: 40px; --wails-draggable: drag; }
-  aside { width: 200px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 46px 10px 12px; border-right: 0.5px solid var(--line); }
+  aside { width: 200px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: var(--top) 10px 12px; border-right: 0.5px solid var(--line); }
   aside h1 { margin: 0 8px 10px; font-size: 18px; }
   aside button { height: 30px; padding: 0 10px; border-radius: 7px; text-align: left; font-size: 13px; }
   aside button:hover { background: var(--fill); }
   aside button.on { background: var(--accent); color: #fff; font-weight: 600; }
   .spacer { flex: 1; }
   .close { color: var(--fg2); }
-  .body { flex: 1; min-width: 0; overflow-y: auto; padding: 46px 24px 24px; }
+  .body { flex: 1; min-width: 0; overflow-y: auto; padding: var(--top) 24px 24px; }
   h2 { margin: 18px 0 6px; font-size: 12px; color: var(--fg3); font-weight: 700; }
   h2:first-child { margin-top: 0; }
   h2.gap { margin-top: 26px; }
