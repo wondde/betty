@@ -220,7 +220,7 @@
   .row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 0.5px solid var(--line); }
   .text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .text b { font-size: 13px; font-weight: 600; }
-  .text small { font-size: 11.5px; color: var(--fg3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .text small { margin-top: 1px; font-size: 11.5px; line-height: 1.45; color: var(--fg3); }
   .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--fill-hover); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--fg2); flex: none; }
   .switch { width: 38px; height: 22px; padding: 2px; border-radius: 11px; background: var(--fill-hover); flex: none; }
