@@ -18,7 +18,7 @@
 
   onMount(() => {
     queue = (app.view.tickets ?? [])
-      .filter((t) => needsCleanup(t) && (!project || t.project?.id === project))
+      .filter((t) => needsCleanup(t, Date.now(), Boolean(app.view.longTerm?.[t.id])) && (!project || t.project?.id === project))
       .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
       .map((t) => t.id)
   })

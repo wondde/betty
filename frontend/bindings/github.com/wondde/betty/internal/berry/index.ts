@@ -18,6 +18,7 @@ export type {
     GitHubRepo,
     GitHubSuggestion,
     History,
+    LongTerm,
     Meeting,
     MeetingInput,
     MeetingPayload,

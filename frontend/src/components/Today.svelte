@@ -1,7 +1,7 @@
 <script lang="ts">
   // 오늘: the home screen. What I should do now sits on top with its buttons in view, then
-  // what waits for my answer, then the rest of my list (folded), then my team in a line per
-  // person and the other teams as one summary line each.
+  // what waits for my answer, then the rest of my quick work (folded), then long-term work on
+  // its own, then my team in a line per person and the other teams as one summary line each.
   import type { Ticket } from '../../bindings/github.com/wondde/betty/internal/berry'
   import { app, asAdmin } from '../lib/view.svelte'
   import { go, areaName, memberArea, type Area } from '../lib/nav.svelte'
@@ -16,9 +16,13 @@
   const all = $derived(v.tickets ?? [])
   const mine = $derived(sortTasks(all.filter((t) => t.assignee_id === me && t.status !== 'done'), isNew, v.order ?? []))
   const urgent = (t: Ticket) => (daysUntil(t.due_date) ?? 99) <= 1
+  // Long-term work (Betty's guess or someone's choice) moves slowly on purpose: it gets its own
+  // section and stays out of 지금 할 일 unless its deadline is close.
+  const isLong = (t: Ticket) => Boolean(v.longTerm?.[t.id])
   // 지금 할 일: due by tomorrow, already started, stuck, or just handed to me.
-  const now = $derived(mine.filter((t) => urgent(t) || t.status !== 'todo' || isNew.has(t.id)))
-  const later = $derived(mine.filter((t) => !now.includes(t)))
+  const now = $derived(mine.filter((t) => urgent(t) || (!isLong(t) && (t.status !== 'todo' || isNew.has(t.id)))))
+  const later = $derived(mine.filter((t) => !now.includes(t) && !isLong(t)))
+  const longTerm = $derived(mine.filter((t) => !now.includes(t) && isLong(t)))
   let showLater = $state(false)
   const LATER = 5
 
@@ -47,7 +51,10 @@
   })
 
   const late = $derived(mine.filter((t) => (daysUntil(t.due_date) ?? 0) < 0).length)
-  const headline = $derived(!mine.length ? '오늘 남은 일이 없어요' : now.length ? `내 일 ${mine.length}개` : `내 일 ${mine.length}개, 급한 건 없어요`)
+  const quickCount = $derived(mine.length - longTerm.length)
+  const headline = $derived(
+    !mine.length ? '오늘 남은 일이 없어요' : !quickCount ? `길게 보는 일 ${longTerm.length}개, 급한 건 없어요` : now.length ? `내 일 ${quickCount}개` : `내 일 ${quickCount}개, 급한 건 없어요`,
+  )
   // Finds are everyone's; they ask for me only when one would land on me (admins sort the rest).
   const showFinds = $derived(finds > 0 && (findsForMe > 0 || asAdmin()))
 </script>
@@ -96,6 +103,15 @@
     </section>
   {/if}
 
+  {#if longTerm.length}
+    <section>
+      <h2>길게 보는 일 <span class="n">{longTerm.length}</span><small>조금씩 진행하는 일이라 오래 그대로여도 괜찮아요</small></h2>
+      {#each longTerm as t (t.id)}
+        <div data-task={t.id}><TaskCard ticket={t} isNew={isNew.has(t.id)} selected={selected === t.id} onselect={() => onselect(t)} {onerror} /></div>
+      {/each}
+    </section>
+  {/if}
+
   {#if !mine.length}
     <div class="empty"><div class="big">🎉</div><p>새 일이 생기면 알려 드릴게요. 아래 칸에 직접 적어도 돼요.</p></div>
   {/if}
@@ -129,6 +145,7 @@
   section { margin-top: 14px; }
   h2 { margin: 0 6px 4px; font-size: 12px; font-weight: 700; color: var(--fg3); }
   h2 .n { font-weight: 500; }
+  h2 small { margin-left: 8px; font-size: 11px; font-weight: 500; }
   .ask, .team { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 4px; border-radius: 10px; background: var(--fill); text-align: left; }
   .ask:hover, .team:hover { background: var(--fill-hover); }
   .ask .dot { width: 26px; height: 26px; flex: none; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 13px; }

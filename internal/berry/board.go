@@ -25,7 +25,14 @@ type Board struct {
 	DesignLinks     map[string][]DesignLink   `json:"design_links"` // by ticket id
 	Trash           []TrashItem               `json:"trash"`
 	AutoAssignments map[string]AutoAssignment `json:"auto_assignments"` // by ticket id
+	LongTerm        map[string]LongTerm       `json:"long_term"`        // open long-term work by ticket id
 	Revision        string                    `json:"revision"`
+}
+
+// LongTerm marks work that moves slowly on purpose (improving, researching, running something).
+// By is "betty" when Betty guessed it, otherwise the name of whoever set it.
+type LongTerm struct {
+	By string `json:"by"`
 }
 
 // TaskProgress is what the automations confirmed finished and still open for a task.
@@ -521,4 +528,9 @@ func (c *Client) SetSetting(ctx context.Context, key string, on bool) error {
 // SetAdmin makes a member an admin or takes it away (admins only; one admin always stays).
 func (c *Client) SetAdmin(ctx context.Context, memberID string, on bool) error {
 	return c.do(ctx, http.MethodPatch, "/api/members/"+url.PathEscape(memberID)+"/admin", map[string]any{"admin": on}, true, nil)
+}
+
+// SetHorizon marks a task as quick ("quick") or long-term ("long"); the choice beats Betty's guess.
+func (c *Client) SetHorizon(ctx context.Context, ticketID, horizon string) error {
+	return c.do(ctx, http.MethodPatch, "/api/tickets/"+url.PathEscape(ticketID)+"/horizon", map[string]any{"horizon": horizon}, true, nil)
 }

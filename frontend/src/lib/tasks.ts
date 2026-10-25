@@ -119,7 +119,8 @@ export function stageLabel(i: GitHubItem): [string, string] {
   return ({ draft: ['준비 중', 'draft'], review_requested: ['리뷰 요청', 'review'] } as Record<string, [string, string]>)[i.stage] ?? ['진행 중', 'open']
 }
 
-// 정리하기 candidates: open work nobody owns, or that hasn't moved for a week.
-export function needsCleanup(t: Ticket, now = Date.now()): boolean {
-  return t.status !== 'done' && (!t.assignee_id || now - Date.parse(t.updated_at) > 7 * 86400000)
+// 정리하기 candidates: open work nobody owns, or quick work that hasn't moved for a week
+// (long-term work moves slowly on purpose).
+export function needsCleanup(t: Ticket, now = Date.now(), longTerm = false): boolean {
+  return t.status !== 'done' && (!t.assignee_id || (!longTerm && now - Date.parse(t.updated_at) > 7 * 86400000))
 }

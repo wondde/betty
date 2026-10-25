@@ -29,6 +29,20 @@
 
   const me = $derived(app.view.member?.id)
   const auto = $derived(app.view.autoAssignments?.[ticket.id])
+  // Quick vs long-term work: Betty guesses from the title; one tap corrects it for everyone.
+  const longTerm = $derived(app.view.longTerm?.[ticket.id])
+  async function setLong(long: boolean) {
+    if (long === Boolean(longTerm)) return
+    saving = true
+    try {
+      await Betty.SetLongTerm(ticket.id, long)
+      onsaved(long ? '길게 보는 일로 옮겼어요' : '빨리 끝낼 일로 옮겼어요')
+    } catch (e) {
+      onerror(message(e))
+    } finally {
+      saving = false
+    }
+  }
   const due = $derived(dueOf(ticket))
   const statuses = [
     ['todo', '할 일'],
@@ -170,6 +184,17 @@
       <dd class="auto" title={auto.reason}>자동 배정 · {auto.reason}. 다른 사람 일이면 위에서 바꿔 주세요.</dd>
     {/if}
 
+    {#if ticket.status !== 'done'}
+      <dt>기간</dt>
+      <dd>
+        <div class="kind" role="radiogroup" aria-label="업무 종류">
+          <button role="radio" aria-checked={!longTerm} class:on={!longTerm} onclick={() => setLong(false)}>빨리 끝낼 일</button>
+          <button role="radio" aria-checked={!!longTerm} class:on={!!longTerm} onclick={() => setLong(true)}>길게 보는 일</button>
+        </div>
+      </dd>
+      {#if longTerm?.by === 'betty'}<dt></dt><dd class="auto">베티가 제목을 보고 정했어요. 아니면 바꿔 주세요.</dd>{/if}
+    {/if}
+
     <dt>마감</dt>
     <dd>
       <!-- An empty WebKit date field shows today's date, so "no deadline" gets its own button. -->
@@ -298,6 +323,10 @@
   dt { font-size: 12px; color: var(--fg3); }
   dd { margin: 0; display: flex; align-items: center; gap: 6px; min-width: 0; }
   select, input[type='date'] { height: 26px; padding: 0 8px; font-size: 12.5px; min-width: 0; flex: 1; }
+  .kind { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--fill); }
+  .kind button { height: 24px; padding: 0 9px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--fg2); }
+  .kind button.on { background: var(--card-solid, #fff); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+  @media (prefers-color-scheme: dark) { .kind button.on { --card-solid: #48484a; } }
   .auto { font-size: 11.5px; color: var(--fg3); line-height: 1.4; margin-top: -4px; }
   .mini { flex: none; height: 26px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 700; background: var(--fill); }
   .none { flex: 1; height: 26px; padding: 0 8px; border-radius: 7px; background: var(--fill); font-size: 12.5px; color: var(--fg3); text-align: left; }

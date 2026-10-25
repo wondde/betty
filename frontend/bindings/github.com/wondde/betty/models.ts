@@ -43,6 +43,11 @@ export interface View {
     "autoAssignments": { [_ in string]?: berry$0.AutoAssignment } | null;
 
     /**
+     * open long-term work by ticket id
+     */
+    "longTerm": { [_ in string]?: berry$0.LongTerm } | null;
+
+    /**
      * my open tasks not looked at yet
      */
     "new": string[] | null;

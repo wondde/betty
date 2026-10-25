@@ -170,6 +170,14 @@ export interface History {
 }
 
 /**
+ * LongTerm marks work that moves slowly on purpose (improving, researching, running something).
+ * By is "betty" when Betty guessed it, otherwise the name of whoever set it.
+ */
+export interface LongTerm {
+    "by": string;
+}
+
+/**
  * Meeting is a calendar entry (Asia/Tokyo dates and times).
  */
 export interface Meeting {

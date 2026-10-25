@@ -98,7 +98,7 @@
   let showOtherList = $state(false)
   $effect(() => { void nav.scope; showOtherList = false })
   const unassignedCount = $derived(all.filter((t) => t.status !== 'done' && !t.assignee_id).length)
-  const cleanupCount = $derived(all.filter((t) => needsCleanup(t) && (!nav.project || t.project?.id === nav.project)).length)
+  const cleanupCount = $derived(all.filter((t) => needsCleanup(t, Date.now(), Boolean(v.longTerm?.[t.id])) && (!nav.project || t.project?.id === nav.project)).length)
 
   // The scope before the project chip narrows it (the chips count from this).
   const scoped = $derived.by(() => {

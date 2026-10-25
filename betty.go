@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.10.0"
+const version = "0.11.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -48,7 +48,8 @@ type View struct {
 	DesignLinks      map[string][]berry.DesignLink   `json:"designLinks"`
 	Trash            []berry.TrashItem               `json:"trash"`
 	AutoAssignments  map[string]berry.AutoAssignment `json:"autoAssignments"`
-	New              []string                        `json:"new"` // my open tasks not looked at yet
+	LongTerm         map[string]berry.LongTerm       `json:"longTerm"` // open long-term work by ticket id
+	New              []string                        `json:"new"`      // my open tasks not looked at yet
 	Order            []string                        `json:"order"`
 	HintDone         bool                            `json:"hintDone"`
 	Onboarded        bool                            `json:"onboarded"`
@@ -112,6 +113,7 @@ func (b *Betty) View() View {
 		v.Meetings = s.Calendar.Meetings
 		v.GitHub, v.Settings, v.DiscordChannels, v.ProjectChannels = s.GitHub, s.Settings, s.DiscordChannels, s.ProjectChannels
 		v.Progress, v.DesignLinks, v.Trash, v.AutoAssignments = s.Progress, s.DesignLinks, s.Trash, s.AutoAssignments
+		v.LongTerm = s.LongTerm
 		seen := toSet(d.Seen)
 		for _, t := range mine(s) {
 			if !seen[t.ID] {
@@ -523,6 +525,15 @@ func (b *Betty) SaveMember(id string, in berry.MemberInput) error {
 
 func (b *Betty) SetSetting(key string, on bool) error {
 	return b.inbox(func(ctx context.Context) error { return b.client.SetSetting(ctx, key, on) })
+}
+
+// SetLongTerm marks a task as long-term work (or back to quick work).
+func (b *Betty) SetLongTerm(id string, long bool) error {
+	horizon := "quick"
+	if long {
+		horizon = "long"
+	}
+	return b.inbox(func(ctx context.Context) error { return b.client.SetHorizon(ctx, id, horizon) })
 }
 
 // SetAdmin gives or takes away team-setup rights for a member.

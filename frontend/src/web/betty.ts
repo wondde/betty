@@ -29,6 +29,7 @@ type Board = {
   design_links: Record<string, berry.DesignLink[]>
   trash: berry.TrashItem[]
   auto_assignments: Record<string, berry.AutoAssignment>
+  long_term: Record<string, berry.LongTerm>
   revision: string
 }
 type BoardTicket = {
@@ -117,7 +118,7 @@ function view(): View {
   const v: View = {
     signedIn, signingIn: false, member: null, isAdmin: false, tickets: [], members: [], projects: [], proposals: [], meetingProposals: [],
     designQuestions: [], meetings: [], github: { repos: [], items: [], suggestions: [], identities: [] }, settings: {}, discordChannels: [],
-    projectChannels: [], progress: {}, designLinks: {}, trash: [], autoAssignments: {}, new: [], order: prefs.order, hintDone: prefs.hintDone,
+    projectChannels: [], progress: {}, designLinks: {}, trash: [], autoAssignments: {}, longTerm: {}, new: [], order: prefs.order, hintDone: prefs.hintDone,
     onboarded: prefs.onboarded, version: VERSION, offline, syncedAt, server: location.origin,
   }
   const s = snapshot
@@ -140,6 +141,7 @@ function view(): View {
     v.designLinks = s.design_links ?? {}
     v.trash = s.trash ?? []
     v.autoAssignments = s.auto_assignments ?? {}
+    v.longTerm = s.long_term ?? {}
     const seen = new Set(prefs.seen)
     v.new = mine(s).filter((t) => !seen.has(t.id)).map((t) => t.id)
   }
@@ -340,6 +342,7 @@ export function SaveProject(id: string, name: string, channelIDs: string[] | nul
 }
 export const SaveMember = (id: string, input: berry.MemberInput) => change(() => (id ? api('PATCH', `/api/members/${enc(id)}`, input) : api('POST', '/api/members', input)))
 export const SetSetting = (key: string, on: boolean) => change(() => api('POST', '/api/settings', { [key]: on }))
+export const SetLongTerm = (id: string, long: boolean) => change(() => api('PATCH', `/api/tickets/${enc(id)}/horizon`, { horizon: long ? 'long' : 'quick' }))
 export const SetAdmin = (memberID: string, on: boolean) => change(() => api('PATCH', `/api/members/${enc(memberID)}/admin`, { admin: on }))
 
 export function Delete(id: string): Promise<void> {

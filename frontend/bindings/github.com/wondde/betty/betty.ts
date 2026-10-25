@@ -200,6 +200,13 @@ export function SetAutostart(on: boolean): $CancellablePromise<void> {
     return $Call.ByID(3011510521, on);
 }
 
+/**
+ * SetLongTerm marks a task as long-term work (or back to quick work).
+ */
+export function SetLongTerm(id: string, long: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3412379072, id, long);
+}
+
 export function SetSetting(key: string, on: boolean): $CancellablePromise<void> {
     return $Call.ByID(2235119384, key, on);
 }
