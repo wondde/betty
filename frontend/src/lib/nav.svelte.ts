@@ -12,14 +12,16 @@ export type Scope =
   | { kind: 'member'; id: string }
 
 // project narrows team-wide lists ('' = all); unassigned shows only work nobody took;
+// longTerm shows only long-term work;
 // board switches 팀 할 일 between the list and status columns.
-export const nav = $state<{ scope: Scope; selected: string | null; query: string; showDone: boolean; project: string; unassigned: boolean; board: boolean }>({
+export const nav = $state<{ scope: Scope; selected: string | null; query: string; showDone: boolean; project: string; unassigned: boolean; longTerm: boolean; board: boolean }>({
   scope: { kind: 'mine' },
   selected: null,
   query: '',
   showDone: false,
   project: '',
   unassigned: false,
+  longTerm: false,
   board: false,
 })
 

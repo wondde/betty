@@ -98,6 +98,7 @@
   let showOtherList = $state(false)
   $effect(() => { void nav.scope; showOtherList = false })
   const unassignedCount = $derived(all.filter((t) => t.status !== 'done' && !t.assignee_id).length)
+  const longTermCount = $derived(all.filter((t) => t.status !== 'done' && v.longTerm?.[t.id]).length)
   const cleanupCount = $derived(all.filter((t) => needsCleanup(t, Date.now(), Boolean(v.longTerm?.[t.id])) && (!nav.project || t.project?.id === nav.project)).length)
 
   // The scope before the project chip narrows it (the chips count from this).
@@ -105,7 +106,7 @@
     const s = nav.scope
     return all.filter((t) => {
       if (s.kind === 'mine') return t.assignee_id === me
-      if (s.kind === 'team' && nav.unassigned) return !t.assignee_id
+      if (s.kind === 'team' && (nav.unassigned || nav.longTerm)) return (!nav.unassigned || !t.assignee_id) && (!nav.longTerm || Boolean(v.longTerm?.[t.id]))
       if (s.kind === 'area') return !!t.assignee_id && areaMembers.has(t.assignee_id)
       if (s.kind === 'project') return t.project?.id === s.id
       if (s.kind === 'member') return t.assignee_id === s.id
@@ -171,7 +172,7 @@
     switch (nav.scope.kind) {
       case 'inbox': return '베티가 디스코드 대화에서 찾은 할 일 후보예요. 맞으면 넣고, 아니면 넘기세요.'
       case 'calendar': return '팀 회의 일정 · 한국·일본 시간'
-      case 'team': return boardMode ? `${summary} · 카드를 끌어 상태를 바꿔요` : nav.unassigned ? `아직 아무도 맡지 않은 일 · ${summary}` : summary
+      case 'team': return boardMode ? `${summary} · 카드를 끌어 상태를 바꿔요` : nav.longTerm ? `조금씩 진행하는 일 · ${summary}` : nav.unassigned ? `아직 아무도 맡지 않은 일 · ${summary}` : summary
       case 'area': return `${summary} · 사람별로 묶었어요`
       case 'mine': return `${v.member?.name ?? ''}님 · ${todayLabel()}`
       default: return summary
@@ -281,6 +282,7 @@
         <div class="filters">
           {#if nav.scope.kind === 'team'}
             <button class="who" class:on={nav.unassigned} onclick={() => (nav.unassigned = !nav.unassigned)} title="아직 아무도 맡지 않은 일만 보기">아무도 안 맡은 일 <span>{unassignedCount}</span></button>
+            {#if longTermCount}<button class="who" class:on={nav.longTerm} onclick={() => (nav.longTerm = !nav.longTerm)} title="개선·조사·운영처럼 조금씩 진행하는 일만 보기">🌱 길게 보는 일 <span>{longTermCount}</span></button>{/if}
           {/if}
           <ProjectChips tickets={scoped} all={!boardMode} />
         </div>
@@ -298,7 +300,7 @@
         {:else if boardMode}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
-          {#if (nav.scope.kind === 'team' && !nav.unassigned) || nav.scope.kind === 'area'}<NowDoing tickets={inScope} onselect={select} />{/if}
+          {#if (nav.scope.kind === 'team' && !nav.unassigned && !nav.longTerm) || nav.scope.kind === 'area'}<NowDoing tickets={inScope} onselect={select} />{/if}
           {#if otherTeam && !showOtherList && !searching}
             <!-- Another team: who is on what is enough; the full list is one click away. -->
             <button class="showall" onclick={() => (showOtherList = true)}>{areaName[(nav.scope as { id: Area }).id]} 팀 업무 목록 모두 보기 · {visible.length}개</button>
