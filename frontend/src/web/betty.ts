@@ -367,7 +367,7 @@ export async function FinishOnboarding() { prefs.onboarded = true; prefs.hintDon
 // Discord sign-in in this tab; the server sets the board session and comes back to "/".
 export async function SignIn(): Promise<void> {
   const { enabled } = await api<{ enabled: boolean }>('GET', '/api/auth/discord')
-  if (!enabled) throw new Error('Discord 로그인이 아직 준비되지 않았어요. 이름과 비밀번호로 로그인해 주세요')
+  if (!enabled) throw new Error('Discord 로그인이 아직 준비되지 않았어요. 관리자에게 알려 주세요')
   location.href = '/auth/discord/start'
 }
 export async function CancelSignIn() {}
