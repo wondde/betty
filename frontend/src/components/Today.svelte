@@ -9,7 +9,7 @@
   import TaskCard from './TaskCard.svelte'
   import NowDoing from './NowDoing.svelte'
 
-  let { selected, isNew, onselect, onerror }: { selected: string | null; isNew: Set<string>; onselect: (t: Ticket) => void; onerror: (m: string) => void } = $props()
+  let { selected, isNew, onselect, onerror, onweekly }: { selected: string | null; isNew: Set<string>; onselect: (t: Ticket) => void; onerror: (m: string) => void; onweekly: () => void } = $props()
 
   const v = $derived(app.view)
   const me = $derived(v.member?.id ?? '')
@@ -55,6 +55,10 @@
   const headline = $derived(
     !mine.length ? '오늘 남은 일이 없어요' : !quickCount ? `길게 보는 일 ${longTerm.length}개, 급한 건 없어요` : now.length ? `내 일 ${quickCount}개` : `내 일 ${quickCount}개, 급한 건 없어요`,
   )
+  // 이번 주 정리: admins see it until this week's routine is done.
+  const review = $derived(v.weeklyReview)
+  const showWeekly = $derived(asAdmin() && !review?.done_at && (review?.items?.length ?? 0) > 0)
+  const reviewCount = (r: string) => review?.items?.filter((i) => i.reason === r).length ?? 0
   // Finds are everyone's; they ask for me only when one would land on me (admins sort the rest).
   const showFinds = $derived(finds > 0 && (findsForMe > 0 || asAdmin()))
 </script>
@@ -71,9 +75,16 @@
     </section>
   {/if}
 
-  {#if showFinds || autoMine.length}
+  {#if showFinds || autoMine.length || showWeekly}
     <section data-coach="ask">
       <h2>확인해 주세요</h2>
+      {#if showWeekly}
+        <button class="ask" onclick={onweekly}>
+          <span class="dot">🧹</span>
+          <span class="text"><b>이번 주 정리 {review?.items?.length ?? 0}개</b><small>{[reviewCount('finished') && `끝난 것 같은 일 ${reviewCount('finished')}`, reviewCount('stale') && `오래 그대로 ${reviewCount('stale')}`, reviewCount('unowned') && `담당 없음 ${reviewCount('unowned')}`].filter(Boolean).join(' · ')}</small></span>
+          <span class="go">정리 시작 ›</span>
+        </button>
+      {/if}
       {#if showFinds}
         <button class="ask" onclick={() => go({ kind: 'inbox' })}>
           <span class="dot">✦</span>

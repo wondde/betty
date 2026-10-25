@@ -4,7 +4,7 @@ import { Events } from '@wailsio/runtime'
 import { Betty, type View } from '../../bindings/github.com/wondde/betty'
 import { BettyView } from '../../bindings/events'
 
-const empty: View = { signedIn: false, signingIn: false, member: null, isAdmin: false, tickets: [], members: [], projects: [], proposals: [], meetingProposals: [], designQuestions: [], meetings: [], github: { repos: [], items: [], suggestions: [], identities: [] }, settings: {}, discordChannels: [], projectChannels: [], progress: {}, designLinks: {}, trash: [], autoAssignments: {}, longTerm: {}, new: [], order: [], hintDone: false, onboarded: false, version: '', offline: false, syncedAt: '', server: '' }
+const empty: View = { signedIn: false, signingIn: false, member: null, isAdmin: false, tickets: [], members: [], projects: [], proposals: [], meetingProposals: [], designQuestions: [], meetings: [], github: { repos: [], items: [], suggestions: [], identities: [] }, settings: {}, discordChannels: [], projectChannels: [], progress: {}, designLinks: {}, trash: [], autoAssignments: {}, longTerm: {}, weeklyReview: { week: '', done_at: '', done_by: '', items: [] }, new: [], order: [], hintDone: false, onboarded: false, version: '', offline: false, syncedAt: '', server: '' }
 export const app = $state<{ view: View; ready: boolean }>({ view: empty, ready: false })
 
 export function connect() {

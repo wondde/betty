@@ -46,6 +46,7 @@ export interface View {
      * open long-term work by ticket id
      */
     "longTerm": { [_ in string]?: berry$0.LongTerm } | null;
+    "weeklyReview": berry$0.WeeklyReview;
 
     /**
      * my open tasks not looked at yet

@@ -115,6 +115,13 @@ export function FinishOnboarding(): $CancellablePromise<void> {
     return $Call.ByID(3125765738);
 }
 
+/**
+ * FinishWeeklyReview marks this week's 정리 routine done.
+ */
+export function FinishWeeklyReview(decided: number): $CancellablePromise<void> {
+    return $Call.ByID(4083253920, decided);
+}
+
 export function HideWindow(name: string): $CancellablePromise<void> {
     return $Call.ByID(3882925176, name);
 }
@@ -237,6 +244,13 @@ export function SignIn(): $CancellablePromise<void> {
  */
 export function SignOut(): $CancellablePromise<void> {
     return $Call.ByID(3861533215);
+}
+
+/**
+ * Snooze keeps a task out of the weekly 정리 routine for 30 days ("다음에 볼게요").
+ */
+export function Snooze(id: string): $CancellablePromise<void> {
+    return $Call.ByID(2830720750, id);
 }
 
 /**

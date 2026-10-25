@@ -30,8 +30,10 @@ export type {
     ProjectChannel,
     Proposal,
     ProposalPayload,
+    ReviewItem,
     Routing,
     TaskProgress,
     Ticket,
-    TrashItem
+    TrashItem,
+    WeeklyReview
 } from "./models.js";

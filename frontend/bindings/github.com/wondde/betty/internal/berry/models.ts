@@ -313,6 +313,21 @@ export interface ProposalPayload {
     "_routing"?: Routing | null;
 }
 
+export interface ReviewItem {
+    "ticket_id": string;
+
+    /**
+     * finished | stale | unowned
+     */
+    "reason": string;
+    "note": string;
+
+    /**
+     * days since anything changed
+     */
+    "idle": number;
+}
+
 /**
  * Routing.Confirmed == false means the project still has to be chosen before approving.
  */
@@ -362,4 +377,17 @@ export interface TrashItem {
     "status": string;
     "deleted_at": string;
     "deleted_by": string;
+}
+
+/**
+ * WeeklyReview is this week's 정리 routine: open work that probably needs a decision.
+ */
+export interface WeeklyReview {
+    /**
+     * Monday, YYYY-MM-DD (KST)
+     */
+    "week": string;
+    "done_at": string;
+    "done_by": string;
+    "items": ReviewItem[] | null;
 }

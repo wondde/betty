@@ -1,14 +1,19 @@
 <script lang="ts">
   // 정리하기: open tasks nobody owns or nobody touched for a week, one at a time, oldest
   // first. Each gets one decision by key: 1 내가 할게 · 2 담당 지정 · 3 완료 · 4 휴지통 ·
-  // → 건너뛰기 (← back). The list is fixed when the mode opens so it doesn't shift under you.
+  // 5 다음에 볼게요 · → 건너뛰기 (← back). The list is fixed when the mode opens so it doesn't
+  // shift under you. weekly: this week's routine from the server (likely finished, quiet for a
+  // month, nobody's), each with why it's here; reaching the end marks the week done.
   import { onMount } from 'svelte'
   import { Betty } from '../../bindings/github.com/wondde/betty'
   import { app, message } from '../lib/view.svelte'
   import { memberArea, areaName } from '../lib/nav.svelte'
   import { dueOf, needsCleanup } from '../lib/tasks'
 
-  let { project = '', onclose, onsaved, onerror }: { project?: string; onclose: () => void; onsaved: (m: string) => void; onerror: (m: string) => void } = $props()
+  let { project = '', weekly = false, onclose, onsaved, onerror }: { project?: string; weekly?: boolean; onclose: () => void; onsaved: (m: string) => void; onerror: (m: string) => void } = $props()
+  const reasonLabel: Record<string, string> = { finished: '끝난 것 같아요', stale: '오래 그대로예요', unowned: '맡은 사람이 없어요' }
+  let why = $state<Record<string, { reason: string; note: string }>>({})
+  let finished = $state(false)
 
   let queue = $state<string[]>([])
   let index = $state(0)
@@ -17,6 +22,12 @@
   const decided = $state<Record<string, string>>({})
 
   onMount(() => {
+    if (weekly) {
+      const items = app.view.weeklyReview?.items ?? []
+      why = Object.fromEntries(items.map((i) => [i.ticket_id, { reason: i.reason, note: i.note }]))
+      queue = items.map((i) => i.ticket_id).filter((id) => app.view.tickets?.some((t) => t.id === id))
+      return
+    }
     queue = (app.view.tickets ?? [])
       .filter((t) => needsCleanup(t, Date.now(), Boolean(app.view.longTerm?.[t.id])) && (!project || t.project?.id === project))
       .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
@@ -41,7 +52,21 @@
   function next() {
     picking = false
     if (index < queue.length - 1) index++
-    else index = queue.length // done screen
+    else {
+      index = queue.length // done screen
+      if (weekly) finishWeek()
+    }
+  }
+  async function finishWeek(close = false) {
+    if (finished) return close && onclose()
+    finished = true
+    try {
+      await Betty.FinishWeeklyReview(Object.keys(decided).length)
+      if (close) onsaved('이번 주 정리를 마쳤어요')
+    } catch (e) {
+      onerror(message(e))
+    }
+    if (close) onclose()
   }
   async function act(label: string, fn: () => Promise<unknown>) {
     if (!t || busy) return
@@ -61,6 +86,7 @@
   const assign = (id: string) => act(`${app.view.members?.find((m) => m.id === id)?.name}에게`, () => Betty.Update(t!.id, { assignee_id: id }))
   const finish = () => act('완료', () => Betty.SetStatus(t!.id, 'done'))
   const trash = () => act('휴지통', () => Betty.Delete(t!.id))
+  const snooze = () => act('한 달 뒤에 다시 보기', () => Betty.Snooze(t!.id))
 
   function keydown(e: KeyboardEvent) {
     if ((e.target as HTMLElement).matches('input, textarea, select')) return
@@ -70,6 +96,7 @@
     else if (e.key === '2') picking = !picking
     else if (e.key === '3') finish()
     else if (e.key === '4') trash()
+    else if (e.key === '5') snooze()
     else if (e.key === 'ArrowRight' || e.key === ' ') (e.preventDefault(), next())
     else if (e.key === 'ArrowLeft') index = Math.max(0, index - 1)
   }
@@ -84,15 +111,19 @@
   <div class="drag" aria-hidden="true"></div>
   <header>
     <div>
-      <h1>정리하기</h1>
-      <p>아무도 안 맡았거나 일주일 넘게 그대로인 일을 하나씩 정리해요. 남은 일 {left}개</p>
+      <h1>{weekly ? '이번 주 정리' : '정리하기'}</h1>
+      <p>{weekly ? '끝난 것 같은 일, 한 달 넘게 그대로인 일, 맡은 사람이 없는 일을 하나씩 정리해요.' : '아무도 안 맡았거나 일주일 넘게 그대로인 일을 하나씩 정리해요.'} 남은 일 {left}개</p>
     </div>
-    <button class="close" onclick={onclose}>끝내기 (Esc)</button>
+    <div class="head-actions">
+      {#if weekly && index < queue.length}<button class="close" onclick={() => finishWeek(true)} title="남은 일은 다음 주 정리에 다시 나와요">이번 주는 여기까지</button>{/if}
+      <button class="close" onclick={onclose}>끝내기 (Esc)</button>
+    </div>
   </header>
   <div class="bar"><i style:width="{queue.length ? (Object.keys(decided).length / queue.length) * 100 : 100}%"></i></div>
 
   {#if t}
     <article>
+      {#if why[t.id]}<p class="why {why[t.id].reason}"><b>{reasonLabel[why[t.id].reason]}</b> · {why[t.id].note}</p>{/if}
       <div class="meta">
         <span class="num">BT-{t.number} · {index + 1}/{queue.length}</span>
         {#if t.project}<span class="project" style:--pc={t.project.color}>{t.project.name}</span>{/if}
@@ -113,8 +144,9 @@
     <div class="actions">
       {#if t.assignee_id !== me}<button disabled={busy} onclick={claim}><kbd>1</kbd>내가 할게</button>{/if}
       <button disabled={busy} class:on={picking} onclick={() => (picking = !picking)}><kbd>2</kbd>담당 지정</button>
-      <button disabled={busy} onclick={finish}><kbd>3</kbd>이미 끝났어요</button>
+      <button disabled={busy} class:primary={why[t.id]?.reason === 'finished'} onclick={finish}><kbd>3</kbd>이미 끝났어요</button>
       <button disabled={busy} class="danger" onclick={trash}><kbd>4</kbd>필요 없어요</button>
+      <button disabled={busy} onclick={snooze} title="한 달 동안 정리 목록에서 빼 둬요"><kbd>5</kbd>다음에 볼게요</button>
       <button disabled={busy} class="skip" onclick={next}>건너뛰기 <kbd>→</kbd></button>
     </div>
     {#if picking}
@@ -131,7 +163,7 @@
     <div class="empty">
       <div class="big">✨</div>
       <p><b>{queue.length ? `${Object.keys(decided).length}개를 정리했어요` : '정리할 일이 없어요'}</b></p>
-      <p>{queue.length ? '남은 일은 다음에 다시 정리하기에서 볼 수 있어요.' : '모든 일에 담당자가 있고 최근에 움직였어요.'}</p>
+      <p>{weekly ? '이번 주 정리를 마쳤어요. 다음 주 월요일에 새로 모아 둘게요.' : queue.length ? '남은 일은 다음에 다시 정리하기에서 볼 수 있어요.' : '모든 일에 담당자가 있고 최근에 움직였어요.'}</p>
       <button class="close" onclick={onclose}>돌아가기</button>
     </div>
   {/if}
@@ -144,6 +176,13 @@
   header { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
   h1 { margin: 0; font-size: 20px; }
   header p { margin: 2px 0 0; font-size: 12px; color: var(--fg3); }
+  .head-actions { display: flex; gap: 6px; }
+  .why { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; font-size: 12px; color: var(--fg2); background: var(--fill); }
+  .why b { color: var(--fg); }
+  .why.finished b { color: var(--green); }
+  .why.stale b { color: var(--orange); }
+  .actions button.primary { background: var(--accent); color: #fff; }
+  .actions button.primary kbd { background: rgba(255,255,255,0.25); color: #fff; }
   .close { padding: 5px 12px; border-radius: 8px; background: var(--fill); font-weight: 600; font-size: 12.5px; }
   .close:hover { background: var(--fill-hover); }
   .bar { height: 3px; margin: 12px 0 18px; border-radius: 2px; background: var(--fill); overflow: hidden; }

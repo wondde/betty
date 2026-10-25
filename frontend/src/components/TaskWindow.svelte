@@ -58,6 +58,7 @@
   }
   const replayTour = () => { localStorage.removeItem(COACH); tour = true }
   let cleaning = $state(false)
+  let weekly = $state(false) // 정리하기 opened as this week's routine
 
   // App menu commands (파일 · 편집 · 보기 · 도움말 …) arrive from Go as "betty:command".
   onMount(() =>
@@ -312,7 +313,7 @@
         {:else if nav.scope.kind === 'calendar'}
           <Calendar onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />
         {:else if nav.scope.kind === 'mine' && !searching}
-          <Today selected={nav.selected} {isNew} onselect={select} onerror={(m) => say(m)} />
+          <Today selected={nav.selected} {isNew} onselect={select} onerror={(m) => say(m)} onweekly={() => ((weekly = true), (cleaning = true))} />
         {:else if boardMode}
           <Board tickets={boardTickets} onselect={select} onerror={(m) => say(m)} />
         {:else}
@@ -367,7 +368,7 @@
   </div>
   <AskDialog />
   {#if capturing}<CaptureSheet onclose={() => (capturing = false)} onsent={(m) => say(m, true)} />{/if}
-  {#if cleaning}<CleanupView project={nav.project} onclose={() => (cleaning = false)} onsaved={(m) => say(m, true)} onerror={(m) => say(m)} />{/if}
+  {#if cleaning}<CleanupView project={weekly ? '' : nav.project} {weekly} onclose={() => ((cleaning = false), (weekly = false))} onsaved={(m) => say(m, true)} onerror={(m) => say(m)} />{/if}
   {#if coaching}<Coach ondone={coachDone} />{/if}
   {#if settings}<SettingsView tab={settings} onclose={() => (settings = null)} ontour={() => ((settings = null), replayTour())} onerror={(m) => say(m)} onsaved={(m) => say(m, true)} />{/if}
   {#if sheet}<Sheet mode={sheet} onclose={() => (sheet = null)} ontour={() => ((sheet = null), replayTour())} />{/if}

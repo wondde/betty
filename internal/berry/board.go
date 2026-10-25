@@ -26,7 +26,23 @@ type Board struct {
 	Trash           []TrashItem               `json:"trash"`
 	AutoAssignments map[string]AutoAssignment `json:"auto_assignments"` // by ticket id
 	LongTerm        map[string]LongTerm       `json:"long_term"`        // open long-term work by ticket id
+	WeeklyReview    WeeklyReview              `json:"weekly_review"`
 	Revision        string                    `json:"revision"`
+}
+
+// WeeklyReview is this week's 정리 routine: open work that probably needs a decision.
+type WeeklyReview struct {
+	Week   string       `json:"week"` // Monday, YYYY-MM-DD (KST)
+	DoneAt string       `json:"done_at"`
+	DoneBy string       `json:"done_by"`
+	Items  []ReviewItem `json:"items"`
+}
+
+type ReviewItem struct {
+	TicketID string `json:"ticket_id"`
+	Reason   string `json:"reason"` // finished | stale | unowned
+	Note     string `json:"note"`
+	Idle     int    `json:"idle"` // days since anything changed
 }
 
 // LongTerm marks work that moves slowly on purpose (improving, researching, running something).
@@ -533,4 +549,14 @@ func (c *Client) SetAdmin(ctx context.Context, memberID string, on bool) error {
 // SetHorizon marks a task as quick ("quick") or long-term ("long"); the choice beats Betty's guess.
 func (c *Client) SetHorizon(ctx context.Context, ticketID, horizon string) error {
 	return c.do(ctx, http.MethodPatch, "/api/tickets/"+url.PathEscape(ticketID)+"/horizon", map[string]any{"horizon": horizon}, true, nil)
+}
+
+// Snooze keeps a task out of the weekly routine for the given days.
+func (c *Client) Snooze(ctx context.Context, ticketID string, days int) error {
+	return c.do(ctx, http.MethodPost, "/api/tickets/"+url.PathEscape(ticketID)+"/snooze", map[string]any{"days": days}, true, nil)
+}
+
+// FinishWeeklyReview marks this week's routine done.
+func (c *Client) FinishWeeklyReview(ctx context.Context, decided int) error {
+	return c.do(ctx, http.MethodPost, "/api/weekly-review/done", map[string]any{"decided": decided}, true, nil)
 }
