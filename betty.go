@@ -23,7 +23,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.9.2"
+const version = "0.9.3"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -35,25 +35,26 @@ type View struct {
 	Members   []berry.Member  `json:"members"`
 	Projects  []berry.Project `json:"projects"`
 	// The review inbox ("베티가 찾은 일")
-	Proposals        []berry.Proposal              `json:"proposals"`
-	MeetingProposals []berry.MeetingProposal       `json:"meetingProposals"`
-	DesignQuestions  []berry.DesignQuestion        `json:"designQuestions"`
-	Meetings         []berry.Meeting               `json:"meetings"`
-	GitHub           berry.GitHub                  `json:"github"`
-	Settings         map[string]bool               `json:"settings"`
-	DiscordChannels  []berry.DiscordChannel        `json:"discordChannels"`
-	ProjectChannels  []berry.ProjectChannel        `json:"projectChannels"`
-	Progress         map[string]berry.TaskProgress `json:"progress"`
-	DesignLinks      map[string][]berry.DesignLink `json:"designLinks"`
-	Trash            []berry.TrashItem             `json:"trash"`
-	New              []string                      `json:"new"` // my open tasks not looked at yet
-	Order            []string                      `json:"order"`
-	HintDone         bool                          `json:"hintDone"`
-	Onboarded        bool                          `json:"onboarded"`
-	Version          string                        `json:"version"`
-	Offline          bool                          `json:"offline"`
-	SyncedAt         string                        `json:"syncedAt"`
-	Server           string                        `json:"server"`
+	Proposals        []berry.Proposal                `json:"proposals"`
+	MeetingProposals []berry.MeetingProposal         `json:"meetingProposals"`
+	DesignQuestions  []berry.DesignQuestion          `json:"designQuestions"`
+	Meetings         []berry.Meeting                 `json:"meetings"`
+	GitHub           berry.GitHub                    `json:"github"`
+	Settings         map[string]bool                 `json:"settings"`
+	DiscordChannels  []berry.DiscordChannel          `json:"discordChannels"`
+	ProjectChannels  []berry.ProjectChannel          `json:"projectChannels"`
+	Progress         map[string]berry.TaskProgress   `json:"progress"`
+	DesignLinks      map[string][]berry.DesignLink   `json:"designLinks"`
+	Trash            []berry.TrashItem               `json:"trash"`
+	AutoAssignments  map[string]berry.AutoAssignment `json:"autoAssignments"`
+	New              []string                        `json:"new"` // my open tasks not looked at yet
+	Order            []string                        `json:"order"`
+	HintDone         bool                            `json:"hintDone"`
+	Onboarded        bool                            `json:"onboarded"`
+	Version          string                          `json:"version"`
+	Offline          bool                            `json:"offline"`
+	SyncedAt         string                          `json:"syncedAt"`
+	Server           string                          `json:"server"`
 }
 
 // Betty is the one service the frontend talks to. Network, Keychain, notifications and
@@ -103,7 +104,7 @@ func (b *Betty) View() View {
 		v.Proposals, v.MeetingProposals, v.DesignQuestions = s.Proposals, s.Calendar.Proposals, s.DesignReview.Questions
 		v.Meetings = s.Calendar.Meetings
 		v.GitHub, v.Settings, v.DiscordChannels, v.ProjectChannels = s.GitHub, s.Settings, s.DiscordChannels, s.ProjectChannels
-		v.Progress, v.DesignLinks, v.Trash = s.Progress, s.DesignLinks, s.Trash
+		v.Progress, v.DesignLinks, v.Trash, v.AutoAssignments = s.Progress, s.DesignLinks, s.Trash, s.AutoAssignments
 		seen := toSet(d.Seen)
 		for _, t := range mine(s) {
 			if !seen[t.ID] {

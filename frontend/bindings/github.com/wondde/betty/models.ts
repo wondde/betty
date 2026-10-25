@@ -35,6 +35,7 @@ export interface View {
     "progress": { [_ in string]?: berry$0.TaskProgress } | null;
     "designLinks": { [_ in string]?: berry$0.DesignLink[] | null } | null;
     "trash": berry$0.TrashItem[] | null;
+    "autoAssignments": { [_ in string]?: berry$0.AutoAssignment } | null;
 
     /**
      * my open tasks not looked at yet

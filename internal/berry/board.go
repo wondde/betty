@@ -10,21 +10,22 @@ import (
 // Board is the subset of the BerryTicket board (/api/state) the app uses:
 // every task, the review inbox, people and projects.
 type Board struct {
-	User            BoardUser               `json:"user"`
-	Tickets         []BoardTicket           `json:"tickets"`
-	Members         []Member                `json:"members"`
-	Projects        []Project               `json:"projects"`
-	Proposals       []Proposal              `json:"proposals"`
-	Calendar        Calendar                `json:"calendar"`
-	DesignReview    DesignReview            `json:"design_review"`
-	GitHub          GitHub                  `json:"github"`
-	Settings        map[string]bool         `json:"settings"`
-	DiscordChannels []DiscordChannel        `json:"discord_channels"`
-	ProjectChannels []ProjectChannel        `json:"project_channels"`
-	Progress        map[string]TaskProgress `json:"progress"`     // by ticket id
-	DesignLinks     map[string][]DesignLink `json:"design_links"` // by ticket id
-	Trash           []TrashItem             `json:"trash"`
-	Revision        string                  `json:"revision"`
+	User            BoardUser                 `json:"user"`
+	Tickets         []BoardTicket             `json:"tickets"`
+	Members         []Member                  `json:"members"`
+	Projects        []Project                 `json:"projects"`
+	Proposals       []Proposal                `json:"proposals"`
+	Calendar        Calendar                  `json:"calendar"`
+	DesignReview    DesignReview              `json:"design_review"`
+	GitHub          GitHub                    `json:"github"`
+	Settings        map[string]bool           `json:"settings"`
+	DiscordChannels []DiscordChannel          `json:"discord_channels"`
+	ProjectChannels []ProjectChannel          `json:"project_channels"`
+	Progress        map[string]TaskProgress   `json:"progress"`     // by ticket id
+	DesignLinks     map[string][]DesignLink   `json:"design_links"` // by ticket id
+	Trash           []TrashItem               `json:"trash"`
+	AutoAssignments map[string]AutoAssignment `json:"auto_assignments"` // by ticket id
+	Revision        string                    `json:"revision"`
 }
 
 // TaskProgress is what the automations confirmed finished and still open for a task.
@@ -33,6 +34,13 @@ type TaskProgress struct {
 	Remaining []ProgressStep `json:"remaining"`
 	UpdatedAt string         `json:"updated_at"`
 	Revision  string         `json:"revision"`
+}
+
+// AutoAssignment: Betty picked this owner by role; cleared once someone changes the owner.
+type AutoAssignment struct {
+	MemberID string `json:"member_id"`
+	Reason   string `json:"reason"`
+	At       string `json:"at"`
 }
 
 // TrashItem is a task someone moved to the trash; it can be restored.

@@ -14,6 +14,7 @@
   // Switches the team decided to keep off (no Discord noise). Turning them on asks first.
   const switches: { key: string; label: string; note: string; guarded?: boolean }[] = [
     { key: 'auto_tickets_enabled', label: '대화에서 업무 자동 만들기', note: '명확한 할 일은 바로 만들고, 애매한 건 "베티가 찾은 일"로 보내요.' },
+    { key: 'auto_assign_enabled', label: '역할로 자동 배정', note: '아무도 맡지 않은 새 업무를 그 프로젝트에서 같은 일(개발·디자인·마케팅)을 하는 사람에게 맡겨요. 자동 배정 표시가 붙고, 담당을 바꾸면 사라져요.' },
     { key: 'design_review_enabled', label: '피그마 변경 자동 검토', note: '디자인 변경을 기존 업무와 대조해요. 디스코드 알림은 보내지 않아요.' },
     { key: 'assignment_notifications_enabled', label: '배정 알림 (디스코드)', note: '새 배정을 공유 채널에 요약해 보내요.', guarded: true },
     { key: 'reminders_enabled', label: '마감 리마인더 (디스코드)', note: '내일 마감인 업무를 하루 한 번 알려요.', guarded: true },

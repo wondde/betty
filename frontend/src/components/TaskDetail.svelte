@@ -28,6 +28,7 @@
   })
 
   const me = $derived(app.view.member?.id)
+  const auto = $derived(app.view.autoAssignments?.[ticket.id])
   const due = $derived(dueOf(ticket))
   const statuses = [
     ['todo', '할 일'],
@@ -164,6 +165,10 @@
       </select>
       {#if ticket.assignee_id !== me}<button class="mini primary" onclick={claim}>내가 할게</button>{/if}
     </dd>
+    {#if auto}
+      <dt></dt>
+      <dd class="auto" title={auto.reason}>자동 배정 · {auto.reason}. 다른 사람 일이면 위에서 바꿔 주세요.</dd>
+    {/if}
 
     <dt>마감</dt>
     <dd>
@@ -293,6 +298,7 @@
   dt { font-size: 12px; color: var(--fg3); }
   dd { margin: 0; display: flex; align-items: center; gap: 6px; min-width: 0; }
   select, input[type='date'] { height: 26px; padding: 0 8px; font-size: 12.5px; min-width: 0; flex: 1; }
+  .auto { font-size: 11.5px; color: var(--fg3); line-height: 1.4; margin-top: -4px; }
   .mini { flex: none; height: 26px; padding: 0 10px; border-radius: 7px; font-size: 12px; font-weight: 700; background: var(--fill); }
   .none { flex: 1; height: 26px; padding: 0 8px; border-radius: 7px; background: var(--fill); font-size: 12.5px; color: var(--fg3); text-align: left; }
   .none:hover { background: var(--fill-hover); color: var(--fg2); }

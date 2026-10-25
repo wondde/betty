@@ -25,6 +25,7 @@
   const done = $derived(ticket.status === 'done')
   const working = $derived(ticket.status === 'in_progress')
   const assignee = $derived(app.view.members?.find((m) => m.id === ticket.assignee_id))
+  const auto = $derived(Boolean(app.view.autoAssignments?.[ticket.id]))
   const guesses = $derived((app.view.github?.suggestions ?? []).filter((s) => s.ticket_id === ticket.id).length)
   const checklist = $derived.by(() => {
     const p = app.view.progress?.[ticket.id]
@@ -80,7 +81,7 @@
   </div>
 
   {#if showAssignee}
-    <span class="who" title={assignee?.name ?? '담당자 없음'} class:none={!assignee}>{assignee ? initial(assignee.name) : ''}</span>
+    <span class="who" title={assignee ? `${assignee.name}${auto ? ' · 자동 배정' : ''}` : '담당자 없음'} class:none={!assignee} class:auto>{assignee ? initial(assignee.name) : ''}</span>
   {/if}
   {#if !done && ticket.status !== 'blocked'}
     <button class="quick" class:working onclick={(e) => (e.stopPropagation(), set(working ? 'todo' : 'in_progress'))} disabled={busy} title={working ? '할 일로 되돌리기' : '시작하기'} aria-label={working ? '할 일로 되돌리기' : '시작하기'}>
@@ -126,6 +127,7 @@
   .due.soon { color: var(--orange); }
   .who { width: 22px; height: 22px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; background: var(--fill-hover); color: var(--fg2); }
   .who.none { background: transparent; }
+  .who.auto { box-shadow: 0 0 0 1.5px var(--card-solid, #fff), 0 0 0 2.5px color-mix(in srgb, var(--accent) 60%, transparent); }
   .quick { width: 24px; height: 24px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--fill); opacity: 0; }
   .quick svg { width: 10px; height: 10px; fill: var(--fg2); }
   .row:hover .quick, .quick:focus-visible { opacity: 1; }
