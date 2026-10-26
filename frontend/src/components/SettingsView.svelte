@@ -30,6 +30,7 @@
   // A tab someone can't see (or lost access to) falls back to 일반.
   $effect(() => { if (!tabs.some(([id]) => id === current)) current = 'general' })
 
+  let checked = $state(false)
   let notifications = $state(false)
   let autostart = $state(false)
   onMount(async () => {
@@ -84,7 +85,19 @@
       <h2>도움말</h2>
       <div class="row"><span>Betty 사용법</span><button onclick={ontour}>다시 보기</button></div>
       {#if !isWeb}<div class="row"><span>웹 보드</span><button onclick={() => Betty.OpenBoard()}>열기 ↗</button></div>{/if}
-      <p class="muted small">Betty {app.view.version}</p>
+      {#if isWeb}
+        <div class="row"><span>맥 앱</span><button onclick={() => Betty.OpenURL(location.origin + '/download')}>받기 ↗</button></div>
+        <p class="muted small">Betty {app.view.version}</p>
+      {:else}
+        <div class="row">
+          <span>Betty {app.view.version}<small class="muted">{app.view.update ? ` · 새 버전 ${app.view.update.version}` : checked ? ' · 최신 버전이에요' : ''}</small></span>
+          {#if app.view.update}
+            <button disabled={app.view.updating} onclick={() => run(() => Betty.InstallUpdate())}>{app.view.updating ? '업데이트하는 중…' : '업데이트'}</button>
+          {:else}
+            <button onclick={() => run(async () => { await Betty.CheckUpdate(); checked = true })}>업데이트 확인</button>
+          {/if}
+        </div>
+      {/if}
     {:else if current === 'team'}
       <AdminView section="team" onerror={err} onsaved={ok} />
     {:else if current === 'automation'}

@@ -14,6 +14,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as berry$0 from "./internal/berry/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as update$0 from "./internal/update/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
@@ -62,6 +65,13 @@ export function CancelSignIn(): $CancellablePromise<void> {
  */
 export function Capture(content: string, projectID: string): $CancellablePromise<void> {
     return $Call.ByID(1853514886, content, projectID);
+}
+
+/**
+ * CheckUpdate asks the server for a newer version now (also from Settings).
+ */
+export function CheckUpdate(): $CancellablePromise<update$0.Info | null> {
+    return $Call.ByID(3330816685);
 }
 
 /**
@@ -131,6 +141,13 @@ export function HideWindow(name: string): $CancellablePromise<void> {
  */
 export function History(cursor: string, status: string): $CancellablePromise<berry$0.History> {
     return $Call.ByID(66976068, cursor, status);
+}
+
+/**
+ * InstallUpdate downloads the newer version, checks it is ours, swaps it in and restarts.
+ */
+export function InstallUpdate(): $CancellablePromise<void> {
+    return $Call.ByID(3120892302);
 }
 
 /**

@@ -1,7 +1,8 @@
 <script lang="ts">
   // Sidebar, kept short: four places, my team (each person), the other teams (one row each),
   // then projects. Team setup lives in Settings, which admins reach from the gear at the bottom.
-  import { app, asAdmin, setAdminView } from '../lib/view.svelte'
+  import { app, asAdmin, setAdminView, message } from '../lib/view.svelte'
+  import { Betty } from '../../bindings/github.com/wondde/betty'
   import { nav, go, sameScope, areaName, memberArea, type Area, type Scope } from '../lib/nav.svelte'
 
   let { onsettings }: { onsettings: (tab?: string) => void } = $props()
@@ -13,6 +14,7 @@
   // Red only when something there waits on me (admins look after all of it).
   const foundForMe = $derived(asAdmin() || (v.proposals ?? []).some((p) => p.payload?.assignee_id === me))
 
+  let updateError = $state('')
   const coachName: Record<string, string> = { mine: 'nav-today', inbox: 'nav-inbox', team: 'nav-all', calendar: 'nav-calendar' }
   const places = $derived([
     { scope: { kind: 'mine' } as Scope, icon: '☀︎', label: '오늘', count: open.filter((t) => t.assignee_id === me).length, hint: '내가 할 일과 확인할 것' },
@@ -95,6 +97,15 @@
     {/if}
   </nav>
 
+  {#if v.update}
+    <!-- One click, like chat apps: download, check it's ours, swap, restart. -->
+    <div class="update" role="status">
+      <b>새 버전 {v.update.version}</b>
+      {#if v.update.notes}<small>{v.update.notes}</small>{/if}
+      <button disabled={v.updating} onclick={() => { updateError = ''; Betty.InstallUpdate().catch((e) => (updateError = message(e))) }}>{v.updating ? '업데이트하는 중…' : '업데이트하고 다시 열기'}</button>
+      {#if updateError}<small class="err">{updateError}</small>{/if}
+    </div>
+  {/if}
   <footer>
     <span class="who">{v.member?.name}</span>
     {#if v.isAdmin}
@@ -138,6 +149,12 @@
   .more.hint { padding-left: 10px; line-height: 1.4; }
   footer { display: flex; align-items: center; justify-content: space-between; padding: 8px 6px 2px; border-top: 0.5px solid var(--line); }
   .who { font-size: 12px; color: var(--fg2); }
+  .update { display: flex; flex-direction: column; gap: 4px; margin: 6px 2px 8px; padding: 10px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .update b { font-size: 12.5px; }
+  .update small { font-size: 11px; color: var(--fg2); line-height: 1.4; }
+  .update small.err { color: var(--red); }
+  .update button { height: 28px; border-radius: 7px; background: var(--accent); color: #fff; font-weight: 700; font-size: 12px; }
+  .update button:disabled { opacity: 0.6; }
   .who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .seg { display: flex; gap: 2px; margin-right: 4px; padding: 2px; border-radius: 7px; background: var(--fill); }
   .seg button { height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11px; font-weight: 600; color: var(--fg3); }

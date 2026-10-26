@@ -120,7 +120,7 @@ function view(): View {
     signedIn, signingIn: false, member: null, isAdmin: false, tickets: [], members: [], projects: [], proposals: [], meetingProposals: [],
     designQuestions: [], meetings: [], github: { repos: [], items: [], suggestions: [], identities: [] }, settings: {}, discordChannels: [],
     projectChannels: [], progress: {}, designLinks: {}, trash: [], autoAssignments: {}, longTerm: {}, weeklyReview: { week: '', done_at: '', done_by: '', items: [] }, new: [], order: prefs.order, hintDone: prefs.hintDone,
-    onboarded: prefs.onboarded, version: VERSION, offline, syncedAt, server: location.origin,
+    onboarded: prefs.onboarded, version: VERSION, offline, syncedAt, server: location.origin, update: null, updating: false,
   }
   const s = snapshot
   if (s && signedIn) {
@@ -397,5 +397,8 @@ export async function OpenURL(link: string) {
   window.open(u.href, '_blank', 'noopener')
 }
 export async function OpenBoard() { window.open('/classic', '_blank', 'noopener') }
+// The web is always the latest build; only the Mac app updates itself.
+export async function CheckUpdate() { return null }
+export async function InstallUpdate() {}
 export async function ShowTasks() {}
 export async function HideWindow(_name: string) {}

@@ -4,6 +4,9 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as berry$0 from "./internal/berry/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as update$0 from "./internal/update/models.js";
 
 /**
  * View is everything the windows need to draw. It is pushed with the "betty:view" event
@@ -59,4 +62,14 @@ export interface View {
     "offline": boolean;
     "syncedAt": string;
     "server": string;
+
+    /**
+     * a newer version to install, if any
+     */
+    "update": update$0.Info | null;
+
+    /**
+     * downloading and swapping it in
+     */
+    "updating": boolean;
 }

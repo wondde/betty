@@ -17,13 +17,14 @@ import (
 	"github.com/wondde/betty/internal/berry"
 	"github.com/wondde/betty/internal/prefs"
 	"github.com/wondde/betty/internal/signin"
+	"github.com/wondde/betty/internal/update"
 	"github.com/wondde/betty/internal/vault"
 )
 
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.13.0"
+const version = "0.14.0"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -58,6 +59,8 @@ type View struct {
 	Offline          bool                            `json:"offline"`
 	SyncedAt         string                          `json:"syncedAt"`
 	Server           string                          `json:"server"`
+	Update           *update.Info                    `json:"update"`   // a newer version to install, if any
+	Updating         bool                            `json:"updating"` // downloading and swapping it in
 }
 
 // Betty is the one service the frontend talks to. Network, Keychain, notifications and
@@ -72,6 +75,8 @@ type Betty struct {
 	offline   bool
 	syncedAt  time.Time
 	signingIn context.CancelFunc
+	update    *update.Info
+	updating  bool
 
 	onCount     func(open int) // menu bar label
 	onShowTasks func()         // open the task window centred (set by main)
@@ -87,7 +92,70 @@ func (b *Betty) ServiceName() string { return "Betty" }
 
 func (b *Betty) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	go b.poll(ctx)
+	go b.watchUpdates(ctx)
 	return nil
+}
+
+// ---------- updates ----------
+
+// watchUpdates looks for a newer version shortly after launch and every 6 hours.
+func (b *Betty) watchUpdates(ctx context.Context) {
+	if update.Bundle() == "" || os.Getenv("BETTY_SERVER") != "" {
+		return // `wails3 dev` or a development server: nothing to update
+	}
+	wait := 10 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+		_, _ = b.CheckUpdate()
+		wait = 6 * time.Hour
+	}
+}
+
+// CheckUpdate asks the server for a newer version now (also from Settings).
+func (b *Betty) CheckUpdate() (*update.Info, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	info, err := update.Check(ctx, b.prefs.Server(), version)
+	if err != nil {
+		return nil, err
+	}
+	b.mu.Lock()
+	b.update = info
+	b.mu.Unlock()
+	b.emit()
+	return info, nil
+}
+
+// InstallUpdate downloads the newer version, checks it is ours, swaps it in and restarts.
+func (b *Betty) InstallUpdate() error {
+	b.mu.Lock()
+	info, busy := b.update, b.updating
+	if info == nil || busy {
+		b.mu.Unlock()
+		return nil
+	}
+	b.updating = true
+	b.mu.Unlock()
+	b.emit()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	err := update.Install(ctx, b.prefs.Server(), *info)
+	if err == nil {
+		application.Get().Quit() // the relaunch waits for this process to end
+		return nil
+	}
+	b.mu.Lock()
+	b.updating = false
+	b.mu.Unlock()
+	b.emit()
+	if errors.Is(err, update.ErrNotWritable) {
+		_ = b.OpenURL(b.prefs.Server() + "/download")
+	}
+	return err
 }
 
 // ---------- view ----------
@@ -96,7 +164,7 @@ func (b *Betty) View() View {
 	d := b.prefs.Get()
 	b.mu.Lock()
 	v := View{SignedIn: vault.Token() != "", SigningIn: b.signingIn != nil, Offline: b.offline, Server: b.prefs.Server(),
-		Order: d.Order, HintDone: d.HintDone, Onboarded: d.Onboarded, Version: version}
+		Order: d.Order, HintDone: d.HintDone, Onboarded: d.Onboarded, Version: version, Update: b.update, Updating: b.updating}
 	if !b.syncedAt.IsZero() {
 		v.SyncedAt = b.syncedAt.Format(time.RFC3339)
 	}
