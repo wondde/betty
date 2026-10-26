@@ -5,12 +5,16 @@
 # Needs: the Developer ID Application certificate and the betty-notary notarytool profile
 # (xcrun notarytool store-credentials betty-notary …). Bump the version in betty.go,
 # build/config.yml and build/darwin/Info.plist first.
+# Where to upload is kept out of the repo: set BETTY_RELEASE_HOST (ssh host) and
+# BETTY_RELEASE_DIR (the server's data/app-releases folder), or put them in
+# scripts/release.local.env (git-ignored).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+[ -f scripts/release.local.env ] && . scripts/release.local.env
 NOTES=${1:-}
 IDENTITY=${BETTY_IDENTITY:-"Developer ID Application: SeungWon Shin (4JAB44S28T)"}
-HOST=${BETTY_RELEASE_HOST:?BETTY_RELEASE_HOST를 정해 주세요}
-DEST=${BETTY_RELEASE_DIR:?BETTY_RELEASE_DIR을 정해 주세요}
+HOST=${BETTY_RELEASE_HOST:?BETTY_RELEASE_HOST를 정해 주세요 (scripts/release.local.env)}
+DEST=${BETTY_RELEASE_DIR:?BETTY_RELEASE_DIR을 정해 주세요 (scripts/release.local.env)}
 V=$(grep -o 'const version = "[^"]*"' betty.go | cut -d'"' -f2)
 OUT=bin/dist
 
