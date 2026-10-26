@@ -14,8 +14,11 @@ DEST=${BETTY_RELEASE_DIR:?BETTY_RELEASE_DIR을 정해 주세요}
 V=$(grep -o 'const version = "[^"]*"' betty.go | cut -d'"' -f2)
 OUT=bin/dist
 
-echo "1/6 빌드 ($V)"
-~/go/bin/wails3 task darwin:package >/dev/null
+echo "1/6 빌드 ($V, Apple 칩 + 인텔)"
+~/go/bin/wails3 task darwin:package:universal >/dev/null
+ARCHS=$(lipo -archs bin/betty.app/Contents/MacOS/betty)
+echo "   $ARCHS"
+[[ "$ARCHS" == *x86_64* && "$ARCHS" == *arm64* ]] || { echo "   인텔/Apple 칩 둘 다 들어 있지 않아요"; exit 1; }
 [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' bin/betty.app/Contents/Info.plist)" = "$V" ] || { echo "   Info.plist 버전이 $V 와 달라요"; exit 1; }
 
 echo "2/6 Developer ID 서명"
@@ -40,7 +43,7 @@ echo "5/6 업데이트용 zip, latest.json"
 ditto -c -k --keepParent "$OUT/stage/Betty.app" "$OUT/Betty-$V.zip"
 SHA=$(shasum -a 256 "$OUT/Betty-$V.zip" | cut -c1-64)
 SIZE=$(stat -f %z "$OUT/Betty-$V.dmg")
-node -e 'const [v,n,s,z]=process.argv.slice(1);console.log(JSON.stringify({version:v,notes:n,dmg:`Betty-${v}.dmg`,zip:`Betty-${v}.zip`,sha256:s,size:Number(z),published_at:new Date().toISOString()},null,1))' "$V" "$NOTES" "$SHA" "$SIZE" > "$OUT/latest.json"
+node -e 'const [v,n,s,z,a]=process.argv.slice(1);console.log(JSON.stringify({version:v,notes:n,dmg:`Betty-${v}.dmg`,zip:`Betty-${v}.zip`,sha256:s,size:Number(z),archs:a.split(" "),published_at:new Date().toISOString()},null,1))' "$V" "$NOTES" "$SHA" "$SIZE" "$ARCHS" > "$OUT/latest.json"
 
 echo "6/6 서버에 올리기 (latest.json은 마지막에)"
 ssh -n "$HOST" "mkdir -p $DEST"
