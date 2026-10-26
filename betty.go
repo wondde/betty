@@ -24,7 +24,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.14.1"
+const version = "0.14.2"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -439,17 +439,19 @@ func (b *Betty) Create(in berry.CreateInput) (berry.Ticket, error) {
 // ---------- review inbox ----------
 
 // ApproveProposal adds a proposed task. projectID is needed only when the proposal's
-// project is unconfirmed (payload._routing.confirmed == false).
-func (b *Betty) ApproveProposal(id, projectID string) error {
-	return b.inbox(func(ctx context.Context) error { return b.client.ApproveProposal(ctx, id, projectID) })
+// project is unconfirmed (payload._routing.confirmed == false). edits: assignee_id, due_date
+// the reviewer changed before approving ("" = none).
+func (b *Betty) ApproveProposal(id, projectID string, edits map[string]string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.ApproveProposal(ctx, id, projectID, edits) })
 }
 
 func (b *Betty) DismissProposal(id string) error {
 	return b.inbox(func(ctx context.Context) error { return b.client.DismissProposal(ctx, id) })
 }
 
-func (b *Betty) ApproveMeeting(id, projectID string) error {
-	return b.inbox(func(ctx context.Context) error { return b.client.ApproveMeeting(ctx, id, projectID) })
+// ApproveMeeting puts a proposed meeting on the calendar; edits: date, start_time, end_time.
+func (b *Betty) ApproveMeeting(id, projectID string, edits map[string]string) error {
+	return b.inbox(func(ctx context.Context) error { return b.client.ApproveMeeting(ctx, id, projectID, edits) })
 }
 
 func (b *Betty) DismissMeeting(id string) error {

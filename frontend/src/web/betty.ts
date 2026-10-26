@@ -285,9 +285,10 @@ export async function Create(input: berry.CreateInput): Promise<berry.Ticket> {
 // ---------- review inbox, calendar ----------
 
 const withProject = (projectID: string) => (projectID ? { project_id: projectID } : {})
-export const ApproveProposal = (id: string, projectID: string) => change(() => api('POST', `/api/proposals/${enc(id)}/approve`, withProject(projectID)))
+const only = (edits: Record<string, string> | null, keys: string[]) => Object.fromEntries(Object.entries(edits ?? {}).filter(([k]) => keys.includes(k)))
+export const ApproveProposal = (id: string, projectID: string, edits: Record<string, string> | null) => change(() => api('POST', `/api/proposals/${enc(id)}/approve`, { ...only(edits, ['assignee_id', 'due_date']), ...withProject(projectID) }))
 export const DismissProposal = (id: string) => change(() => api('POST', `/api/proposals/${enc(id)}/dismiss`, {}))
-export const ApproveMeeting = (id: string, projectID: string) => change(() => api('POST', `/api/meeting-proposals/${enc(id)}/approve`, withProject(projectID)))
+export const ApproveMeeting = (id: string, projectID: string, edits: Record<string, string> | null) => change(() => api('POST', `/api/meeting-proposals/${enc(id)}/approve`, { ...only(edits, ['date', 'start_time', 'end_time']), ...withProject(projectID) }))
 export const DismissMeeting = (id: string) => change(() => api('POST', `/api/meeting-proposals/${enc(id)}/dismiss`, {}))
 export const DismissDesignQuestion = (id: string) => change(() => api('POST', `/api/design-review/questions/${enc(id)}/dismiss`, {}))
 

@@ -345,8 +345,9 @@ func (c *Client) UpdateTicket(ctx context.Context, id, expected string, changes 
 }
 
 // ApproveProposal adds the proposed task; projectID is required only when routing is unconfirmed.
-func (c *Client) ApproveProposal(ctx context.Context, id, projectID string) error {
-	body := map[string]any{}
+// edits are what the reviewer changed first: assignee_id and due_date ("" = none).
+func (c *Client) ApproveProposal(ctx context.Context, id, projectID string, edits map[string]string) error {
+	body := pick(edits, "assignee_id", "due_date")
 	if projectID != "" {
 		body["project_id"] = projectID
 	}
@@ -357,8 +358,9 @@ func (c *Client) DismissProposal(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodPost, "/api/proposals/"+url.PathEscape(id)+"/dismiss", map[string]any{}, true, nil)
 }
 
-func (c *Client) ApproveMeeting(ctx context.Context, id, projectID string) error {
-	body := map[string]any{}
+// ApproveMeeting adds the proposed meeting; edits may set date, start_time and end_time.
+func (c *Client) ApproveMeeting(ctx context.Context, id, projectID string, edits map[string]string) error {
+	body := pick(edits, "date", "start_time", "end_time")
 	if projectID != "" {
 		body["project_id"] = projectID
 	}
@@ -559,4 +561,15 @@ func (c *Client) Snooze(ctx context.Context, ticketID string, days int) error {
 // FinishWeeklyReview marks this week's routine done.
 func (c *Client) FinishWeeklyReview(ctx context.Context, decided int) error {
 	return c.do(ctx, http.MethodPost, "/api/weekly-review/done", map[string]any{"decided": decided}, true, nil)
+}
+
+// pick copies only the allowed keys of a reviewer's edits into a request body.
+func pick(edits map[string]string, keys ...string) map[string]any {
+	body := map[string]any{}
+	for _, k := range keys {
+		if v, ok := edits[k]; ok {
+			body[k] = v
+		}
+	}
+	return body
 }

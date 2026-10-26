@@ -14,6 +14,10 @@
   let picks = $state<Record<string, string>>({})
   let busy = $state<string | null>(null)
   let open = $state<Record<string, boolean>>({})
+  // What the reviewer changes before approving: owner/due for tasks, date/time for meetings.
+  let edits = $state<Record<string, Record<string, string>>>({})
+  const field = (id: string, key: string, fallback?: string | null) => edits[id]?.[key] ?? fallback ?? ''
+  const edit = (id: string, key: string, value: string) => (edits[id] = { ...edits[id], [key]: value })
 
   const UNDECIDED = '__undecided'
   const project = (id: string) => v.projects?.find((p) => p.id === id)
@@ -80,7 +84,7 @@
     if (unconfirmed(p) && !picks[p.id]) return onerror('어느 프로젝트 업무인지 먼저 골라 주세요')
     const older = tasks.older.get(p.id) ?? []
     run(p.id, async () => {
-      await Betty.ApproveProposal(p.id, unconfirmed(p) ? picks[p.id] : '')
+      await Betty.ApproveProposal(p.id, unconfirmed(p) ? picks[p.id] : '', p.kind === 'create' ? edits[p.id] ?? {} : {})
       for (const o of older) await Betty.DismissProposal(o.id)
     }, '할 일에 넣었어요')
   }
@@ -92,8 +96,8 @@
   }
   function approveMeeting(m: MeetingProposal) {
     if (unconfirmed(m) && !picks[m.id]) return onerror('어느 프로젝트 회의인지 먼저 골라 주세요')
-    if (!m.payload.date) return onerror('날짜가 정해지지 않은 회의는 캘린더에서 날짜를 정해 주세요')
-    run(m.id, () => Betty.ApproveMeeting(m.id, unconfirmed(m) ? picks[m.id] : ''), '캘린더에 넣었어요')
+    if (!field(m.id, 'date', m.payload.date)) return onerror('회의 날짜를 정해 주세요')
+    run(m.id, () => Betty.ApproveMeeting(m.id, unconfirmed(m) ? picks[m.id] : '', edits[m.id] ?? {}), '캘린더에 넣었어요')
   }
 </script>
 
@@ -123,7 +127,18 @@
             <p class="target">{t ? `BT-${t.number} ${t.title}` : '기존 업무'}{older.length ? ` · 같은 업무 제안 ${older.length + 1}개 중 최신` : ''}</p>
             {#if diff.length}<ul class="diff">{#each diff as d}<li>{d}</li>{/each}</ul>{:else}<p class="meta">바뀌는 항목이 없어요. 넘겨도 돼요.</p>{/if}
           {:else}
-            <p class="meta">{memberName(p.payload.assignee_id) ? `${memberName(p.payload.assignee_id)}님이 맡아요` : '맡은 사람 없음'}{p.payload.due_date ? ` · ${md(p.payload.due_date)}까지` : ''}</p>
+            <div class="fields">
+              <label>담당
+                <select value={field(p.id, 'assignee_id', p.payload.assignee_id)} onchange={(e) => edit(p.id, 'assignee_id', (e.target as HTMLSelectElement).value)}>
+                  <option value="">맡은 사람 없음</option>
+                  {#each v.members ?? [] as mb (mb.id)}<option value={mb.id}>{mb.name}{mb.id === v.member?.id ? ' (나)' : ''}</option>{/each}
+                </select>
+              </label>
+              <label>마감
+                <input type="date" value={field(p.id, 'due_date', p.payload.due_date)} onchange={(e) => edit(p.id, 'due_date', (e.target as HTMLInputElement).value)} />
+                {#if field(p.id, 'due_date', p.payload.due_date)}<button class="clear" onclick={() => edit(p.id, 'due_date', '')} aria-label="마감 지우기">✕</button>{/if}
+              </label>
+            </div>
           {/if}
           {#if open[p.id]}
             {#if p.payload.description}<p class="desc">{p.payload.description}</p>{/if}
@@ -149,7 +164,16 @@
             <span class="kind meeting">{m.kind === 'update' ? (m.payload.status === 'cancelled' ? '회의 취소' : '회의 변경') : '새 회의'}</span>
             <h3>{m.payload.title}</h3>
           </div>
-          <p class="meta">{m.payload.date ? `${md(m.payload.date)} ${m.payload.start_time || '시간 미정'}` : '날짜 미정'}{m.payload.location ? ` · ${m.payload.location}` : ''}</p>
+          {#if m.payload.status === 'cancelled'}
+            <p class="meta">{m.payload.date ? `${md(m.payload.date)} ${m.payload.start_time || ''}` : ''}{m.payload.location ? ` · ${m.payload.location}` : ''}</p>
+          {:else}
+            <div class="fields">
+              <label>날짜<input type="date" class:missing={!field(m.id, 'date', m.payload.date)} value={field(m.id, 'date', m.payload.date)} onchange={(e) => edit(m.id, 'date', (e.target as HTMLInputElement).value)} /></label>
+              <label>시작<input type="time" value={field(m.id, 'start_time', m.payload.start_time)} onchange={(e) => edit(m.id, 'start_time', (e.target as HTMLInputElement).value)} /></label>
+              <label>끝<input type="time" value={field(m.id, 'end_time', m.payload.end_time)} onchange={(e) => edit(m.id, 'end_time', (e.target as HTMLInputElement).value)} /></label>
+              {#if m.payload.location}<span class="place">{m.payload.location}</span>{/if}
+            </div>
+          {/if}
           {#if open[m.id]}<p class="why"><b>찾은 이유</b> {m.reason}</p>{/if}
           <div class="actions">
             {#if unconfirmed(m)}
@@ -203,6 +227,14 @@
   .meta { margin: 3px 0 0; font-size: 12px; color: var(--fg2); }
   .why { margin: 6px 0 0; padding: 6px 8px; border-radius: 7px; background: var(--fill); font-size: 12px; line-height: 1.5; color: var(--fg2); user-select: text; -webkit-user-select: text; }
   .why b { color: var(--fg3); font-weight: 600; margin-right: 4px; }
+  .fields { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 6px; font-size: 12px; color: var(--fg3); }
+  .fields label { display: inline-flex; align-items: center; gap: 6px; }
+  .fields select, .fields input { height: 26px; padding: 0 8px; border: none; outline: none; border-radius: 7px; background: var(--fill); font: inherit; font-size: 12px; color: var(--fg); }
+  .fields select:focus, .fields input:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .fields input.missing { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--orange) 70%, transparent); }
+  .fields .clear { width: 22px; height: 22px; border-radius: 6px; color: var(--fg3); }
+  .fields .clear:hover { background: var(--fill-hover); }
+  .place { color: var(--fg2); }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
   .actions button, .actions select { height: 26px; padding: 0 11px; border-radius: 7px; background: var(--fill); font-size: 12px; font-weight: 600; border: none; color: inherit; }
   .actions button:hover { background: var(--fill-hover); }

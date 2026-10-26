@@ -37,16 +37,20 @@ export function AllowNotifications(): $CancellablePromise<boolean> {
     return $Call.ByID(3353362703);
 }
 
-export function ApproveMeeting(id: string, projectID: string): $CancellablePromise<void> {
-    return $Call.ByID(678130410, id, projectID);
+/**
+ * ApproveMeeting puts a proposed meeting on the calendar; edits: date, start_time, end_time.
+ */
+export function ApproveMeeting(id: string, projectID: string, edits: { [_ in string]?: string } | null): $CancellablePromise<void> {
+    return $Call.ByID(678130410, id, projectID, edits);
 }
 
 /**
  * ApproveProposal adds a proposed task. projectID is needed only when the proposal's
- * project is unconfirmed (payload._routing.confirmed == false).
+ * project is unconfirmed (payload._routing.confirmed == false). edits: assignee_id, due_date
+ * the reviewer changed before approving ("" = none).
  */
-export function ApproveProposal(id: string, projectID: string): $CancellablePromise<void> {
-    return $Call.ByID(54284815, id, projectID);
+export function ApproveProposal(id: string, projectID: string, edits: { [_ in string]?: string } | null): $CancellablePromise<void> {
+    return $Call.ByID(54284815, id, projectID, edits);
 }
 
 /**
