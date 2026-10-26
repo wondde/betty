@@ -24,7 +24,7 @@ import (
 const pollEvery = 15 * time.Second
 
 // version is shown in Settings and "Betty에 관하여"; keep in sync with build/config.yml.
-const version = "0.14.2"
+const version = "0.14.3"
 
 // View is everything the windows need to draw. It is pushed with the "betty:view" event
 // whenever it changes, so every window (menu bar, quick add) stays in sync.
@@ -143,7 +143,7 @@ func (b *Betty) InstallUpdate() error {
 	b.emit()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	err := update.Install(ctx, b.prefs.Server(), *info)
+	err := update.Install(ctx, b.prefs.Server(), *info, version)
 	if err == nil {
 		application.Get().Quit() // the relaunch waits for this process to end
 		return nil

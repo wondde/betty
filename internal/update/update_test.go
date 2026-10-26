@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -44,5 +46,24 @@ func TestCheck(t *testing.T) {
 	defer empty.Close()
 	if info, err := Check(context.Background(), empty.URL, "0.13.0"); err != nil || info != nil {
 		t.Fatalf("no release should be quiet: %v %v", info, err)
+	}
+}
+
+func TestCheckVersion(t *testing.T) {
+	app := filepath.Join(t.TempDir(), "Betty.app")
+	if err := os.MkdirAll(filepath.Join(app, "Contents"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plist := `<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict><key>CFBundleShortVersionString</key><string>0.14.1</string></dict></plist>`
+	if err := os.WriteFile(filepath.Join(app, "Contents", "Info.plist"), []byte(plist), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkVersion(app, "0.14.1", "0.14.0"); err != nil {
+		t.Fatalf("a real newer version is refused: %v", err)
+	}
+	for _, c := range [][2]string{{"99.0", "0.14.0"}, {"0.14.1", "0.14.2"}, {"0.14.1", "0.14.1"}} {
+		if checkVersion(app, c[0], c[1]) == nil {
+			t.Errorf("offered %s on %s should be refused (app is 0.14.1)", c[0], c[1])
+		}
 	}
 }

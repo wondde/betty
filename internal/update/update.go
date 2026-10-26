@@ -119,8 +119,10 @@ func Bundle() string {
 var ErrNotWritable = errors.New("이 맥에서는 앱을 직접 바꿀 수 없어요. 다운로드 페이지에서 받아 주세요")
 
 // Install downloads, verifies and swaps in the update, then relaunches. On success the caller
-// should quit right away.
-func Install(ctx context.Context, server string, info Info) error {
+// should quit right away. current is the running version: the downloaded app must really be
+// the offered version and newer than current, so a tampered latest.json can't roll the app
+// back to an older (genuinely signed) build.
+func Install(ctx context.Context, server string, info Info, current string) error {
 	app := Bundle()
 	if app == "" {
 		return errors.New("개발용 실행에서는 업데이트하지 않아요")
@@ -151,6 +153,9 @@ func Install(ctx context.Context, server string, info Info) error {
 		return errors.New("업데이트 파일에 앱이 없어요")
 	}
 	if err := verify(ctx, apps[0]); err != nil {
+		return err
+	}
+	if err := checkVersion(apps[0], info.Version, current); err != nil {
 		return err
 	}
 
@@ -226,4 +231,18 @@ func writable(path string) bool {
 	f.Close()
 	os.Remove(name)
 	return true
+}
+
+// checkVersion makes sure the app in the update is the version latest.json promised and is
+// newer than the running one (its own Info.plist decides, not latest.json).
+func checkVersion(app, offered, current string) error {
+	out, err := exec.Command("/usr/bin/plutil", "-extract", "CFBundleShortVersionString", "raw", "-o", "-", filepath.Join(app, "Contents", "Info.plist")).Output()
+	if err != nil {
+		return errors.New("업데이트의 버전을 읽지 못했어요")
+	}
+	got := strings.TrimSpace(string(out))
+	if got != offered || !Newer(got, current) {
+		return fmt.Errorf("업데이트 버전(%s)이 안내(%s)와 다르거나 지금 버전(%s)보다 새롭지 않아 설치하지 않았어요", got, offered, current)
+	}
+	return nil
 }
